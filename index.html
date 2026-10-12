@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Piano Tutor: learn piano with falling notes</title>
+<meta name="description" content="Piano Tutor is the easiest way to learn piano: falling notes, every key named, practice one hand at a time, works with any MIDI keyboard.">
+<meta name="theme-color" content="#0a0e15">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png">
+<link rel="stylesheet" href="style.css?v=16">
+<script src="vendor/tone.js"></script>
+<script src="vendor/midi.js"></script>
+<script src="vendor/vexflow.js"></script>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="logo" viewBox="0 0 24 24"><path d="M3 10v4M7 7v10M11 4v16M15 8v8M19 6v12M23 10v4"/></symbol>
+  <symbol id="chev" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5"/></symbol>
+  <symbol id="gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2.5l2 2.2 3-.4.7 2.9 2.7 1.4-1.1 2.8 1.1 2.8-2.7 1.4-.7 2.9-3-.4-2 2.2-2-2.2-3 .4-.7-2.9-2.7-1.4 1.1-2.8-1.1-2.8 2.7-1.4.7-2.9 3 .4z"/></symbol>
+  <symbol id="full" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
+  <symbol id="note" viewBox="0 0 24 24"><path d="M10 18V5l8-2"/><circle cx="7" cy="18" r="3"/></symbol>
+  <symbol id="piano" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M7 5v9M12 5v9M17 5v9M7 14v5M12 14v5M17 14v5"/></symbol>
+</svg>
+
+<!-- ============ Library ============ -->
+<section class="screen lib-screen" id="library">
+  <div class="topbar">
+    <button class="ibtn" id="sideOpen" aria-label="Open menu"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <div class="hist">
+      <button class="ibtn sm" id="navBack" title="Back" aria-label="Back"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
+      <button class="ibtn sm" id="navFwd" title="Forward" aria-label="Forward"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
+    </div>
+    <nav class="crumbs" aria-label="Breadcrumb"><span>Library</span><span class="sep">/</span><b id="crumb">All Songs</b></nav>
+    <div class="search">
+      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg>
+      <input type="search" id="search" placeholder="Search songs, artists or genres" autocomplete="off" spellcheck="false" aria-label="Search songs, artists or genres">
+      <kbd>⌘K</kbd>
+    </div>
+    <button class="midi-chip" id="midiChip" title="MIDI keyboard"><span class="led"></span><span class="mc-text">No keyboard</span></button>
+  </div>
+
+  <div class="lib-body">
+    <aside class="side" id="side" aria-label="Sidebar">
+      <div class="side-brand"><img class="brand-icon" src="icons/icon-192.png" alt=""><b>Piano Tutor</b><span class="tag" id="brandTag" hidden>Atlantic Notes</span><span class="tag pro" id="proBadge" hidden>Pro</span></div>
+      <div class="side-scroll">
+        <nav class="side-nav" aria-label="Library">
+          <button class="nav-item" data-view="library"><svg viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg><span class="lbl">All Songs</span><span class="n"></span></button>
+          <button class="nav-item" data-view="recent"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg><span class="lbl">Recent</span><span class="n"></span></button>
+          <button class="nav-item" data-view="free" title="Play the piano freely with your computer or MIDI keyboard"><svg><use href="#piano"/></svg><span class="lbl">Free Play</span><span class="n"></span></button>
+          <button class="nav-item" data-view="favorites"><svg viewBox="0 0 24 24"><path d="M12 20s-7.5-4.6-7.5-10.1A4.2 4.2 0 0 1 12 7.4a4.2 4.2 0 0 1 7.5 2.5C19.5 15.4 12 20 12 20z"/></svg><span class="lbl">Favorites</span><span class="n"></span></button>
+        </nav>
+        <div class="side-sec">
+          <button class="sec-title" data-view="playlists">Playlists</button>
+          <button class="ibtn xs" id="newPlaylist" title="New playlist" aria-label="New playlist"><svg viewBox="0 0 24 24"><path d="M12 6v12M6 12h12"/></svg></button>
+        </div>
+        <nav class="side-nav" id="sidePlaylists" aria-label="Playlists"></nav>
+        <div class="side-sec"><span class="sec-title">Settings</span></div>
+        <nav class="side-nav" aria-label="Settings">
+          <button class="nav-item" data-view="devices"><svg><use href="#piano"/></svg><span class="lbl">MIDI Devices</span><span class="led"></span></button>
+        </nav>
+      </div>
+      <div class="ad-slot ad-side" data-slot="sidebar" hidden></div>
+      <button class="upgrade-btn" id="upgradeBtn" hidden>
+        <svg viewBox="0 0 24 24"><path d="M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.6 6.6 19.5l1.2-6L3.3 9.3l6.1-.7z"/></svg>
+        <span>Remove ads</span><em id="upgradeBtnPrice">$10</em>
+      </button>
+      <div class="side-foot">
+        <button class="add-folder" id="folderBtn"><svg viewBox="0 0 24 24"><path d="M12 6v12M6 12h12"/></svg><span id="folderLabel">Add Music Folder</span></button>
+        <label class="add-files">or add MIDI files
+          <input type="file" id="addFiles" multiple accept=".mid,.midi,.kar,audio/midi,audio/x-midi" hidden>
+        </label>
+        <input type="file" id="dirInput" webkitdirectory multiple hidden>
+      </div>
+    </aside>
+    <div class="side-scrim" id="sideScrim"></div>
+
+    <main class="lib-main">
+      <div class="lib-scroll" id="libScroll">
+        <div id="libBody">
+          <header class="page-head">
+            <div>
+              <h1 id="viewTitle">All Songs</h1>
+              <p id="viewSub"></p>
+            </div>
+            <button class="btn" id="surpriseBtn" title="Open a random song from this list">
+              <svg viewBox="0 0 24 24"><path d="M3 7h3.5c4 0 6.5 10 11 10H21M3 17h3.5c1.6 0 2.9-1.6 4-3.6M14.5 9.6c1-1.5 2-2.6 3-2.6H21M18 4l3 3-3 3M18 14l3 3-3 3"/></svg><span>Surprise me</span>
+            </button>
+          </header>
+          <div class="ad-slot ad-wide" data-slot="library" hidden></div>
+          <div class="lib-status" id="libStatus"></div>
+
+          <section class="shelf" id="shelf" hidden>
+            <div class="shelf-head">
+              <button class="shelf-toggle" id="shelfToggle" aria-controls="shelfRow">
+                <svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5"/></svg><span id="shelfTitle">Continue learning</span>
+              </button>
+              <button class="link" id="shelfAll">All recent</button>
+            </div>
+            <div class="shelf-row" id="shelfRow"></div>
+          </section>
+
+          <div class="toolbar">
+            <div class="filter-bar" id="filterBar">
+              <div class="tabs" id="levelTabs" role="group" aria-label="Difficulty"></div>
+              <div class="grow"></div>
+              <button class="ctl" id="filterBtn" aria-haspopup="menu"><svg viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></svg><span id="filterLabel">Filters</span></button>
+              <div class="sort">
+                <label class="ctl-label" for="sortSel">Sort</label>
+                <select id="sortSel" aria-label="Sort by">
+                  <option value="artist">Artist</option>
+                  <option value="title">Title</option>
+                  <option value="played">Recently played</option>
+                  <option value="added">Recently added</option>
+                  <option value="level">Difficulty</option>
+                  <option value="duration">Duration</option>
+                </select>
+                <button class="ibtn sm sort-dir" id="sortDir"><svg viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6"/></svg></button>
+              </div>
+              <div class="seg-mini" id="layoutSeg" role="group" aria-label="View">
+                <button data-v="list" title="List view" aria-label="List view"><svg viewBox="0 0 24 24"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg></button>
+                <button data-v="grid" title="Grid view" aria-label="Grid view"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1"/><rect x="13" y="4" width="7" height="7" rx="1"/><rect x="4" y="13" width="7" height="7" rx="1"/><rect x="13" y="13" width="7" height="7" rx="1"/></svg></button>
+              </div>
+            </div>
+            <div class="bulk-bar" id="bulkBar" hidden>
+              <span class="bulk-count" id="bulkCount"></span>
+              <button class="btn sm" id="bulkFav"></button>
+              <button class="btn sm" id="bulkList">Add to playlist…</button>
+              <button class="btn sm" id="bulkRemove" hidden>Remove from playlist</button>
+              <div class="grow"></div>
+              <button class="btn sm ghost" id="bulkClear">Clear <kbd>Esc</kbd></button>
+            </div>
+            <div class="thead" id="tableHead" role="row">
+              <span class="c-num"><label class="c-cb"><input type="checkbox" id="selectAll" aria-label="Select all songs in this list"></label><span class="hash">#</span></span>
+              <span class="c-ti">Title</span>
+              <span class="c-gn" id="col3Head">Genre</span>
+              <span class="c-du" title="Duration"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg></span>
+              <span class="c-act"><span class="count" id="resultCount" aria-live="polite"></span></span>
+            </div>
+          </div>
+
+          <div class="songlist" id="songList" role="grid" aria-label="Songs"></div>
+          <div class="empty" id="emptyState" hidden></div>
+        </div>
+        <div class="pl-view" id="playlistsView" hidden></div>
+        <div class="dev-view" id="devicesView" hidden></div>
+      </div>
+      <nav class="az" id="az" aria-label="Jump to letter" hidden></nav>
+    </main>
+  </div>
+
+  <footer class="nowbar" id="nowBar" hidden>
+    <div class="nb-song">
+      <span id="nbArt"></span>
+      <span class="nb-text"><b id="nbTitle"></b><span id="nbArtist"></span></span>
+      <button class="icon-act fav" id="nbFav" aria-label="Favourite"></button>
+    </div>
+    <div class="nb-center">
+      <div class="nb-ctrl">
+        <button class="ibtn" id="nbPrev" title="Previous song" aria-label="Previous song"><svg viewBox="0 0 24 24"><path d="M6 5h2v14H6zM19 5v14L9 12z"/></svg></button>
+        <button class="nb-play" id="nbPlay" aria-label="Play preview"></button>
+        <button class="ibtn" id="nbNext" title="Next song" aria-label="Next song"><svg viewBox="0 0 24 24"><path d="M16 5h2v14h-2zM5 5v14l10-7z"/></svg></button>
+      </div>
+      <div class="nb-prog"><span id="nbPos">0:00</span><div class="nb-bar"><i id="nbFill"></i></div><span id="nbLen">0:30</span></div>
+    </div>
+    <div class="nb-actions">
+      <button class="btn sm" id="nbMore">Hands…</button>
+      <button class="btn primary" id="nbLearn">Learn</button>
+    </div>
+  </footer>
+</section>
+
+<!-- ============ Player ============ -->
+<section class="screen" id="player" hidden>
+  <header class="bar">
+    <div class="bar-left">
+      <button class="brand" id="backBtn" title="Back to songs (Esc)"><img class="brand-icon" src="icons/icon-192.png" alt="">Piano Tutor</button>
+      <button class="song-pick" id="songPick" title="Choose another song">
+        <span id="songTitle"></span><svg><use href="#chev"/></svg>
+      </button>
+    </div>
+
+    <div class="bar-center">
+      <button class="tbtn" id="restartBtn" title="Restart">
+        <svg viewBox="0 0 24 24"><path d="M6 5h2.2v14H6zM19 5v14L9 12z"/></svg>
+      </button>
+      <button class="play" id="playBtn" title="Play / pause (Space)">
+        <svg viewBox="0 0 24 24" id="playIcon"><path d="M8 5v14l11-7z"/></svg>
+      </button>
+      <button class="tbtn" id="nextBtn" title="Next song">
+        <svg viewBox="0 0 24 24"><path d="M15.8 5H18v14h-2.2zM5 5v14l10-7z"/></svg>
+      </button>
+    </div>
+
+    <div class="bar-right">
+      <div class="menu-wrap">
+        <button class="bpm" id="bpmBtn" title="Tempo">
+          <svg><use href="#note"/></svg><span id="bpmVal">120 BPM</span><svg class="chev"><use href="#chev"/></svg>
+        </button>
+        <div class="menu" id="bpmMenu" hidden></div>
+      </div>
+      <button class="ibtn midi-pill" title="Connect a USB or Bluetooth MIDI keyboard">
+        <svg><use href="#piano"/></svg><span class="led"></span>
+      </button>
+      <button class="ibtn" id="settingsBtn" title="Settings"><svg><use href="#gear"/></svg></button>
+      <button class="ibtn" id="fsBtn" title="Full screen"><svg><use href="#full"/></svg></button>
+    </div>
+  </header>
+
+  <main class="stage">
+    <div class="sheet" id="sheet" hidden>
+      <div class="sheet-strip" id="sheetStrip"></div>
+      <div class="playhead"></div>
+    </div>
+    <div class="panel" id="rollwrap">
+      <canvas id="roll"></canvas>
+      <div class="waiting" id="waiting">Your turn: play the lit keys</div>
+    </div>
+
+    <aside class="drawer" id="settings" hidden>
+      <div class="drawer-head">
+        <h2>Settings</h2>
+        <button class="ibtn" id="closeSettings" title="Close">
+          <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <h3 class="tracks-sec">Tracks</h3>
+      <p class="note tracks-sec">Which hand plays each part. Background parts are always played for you.</p>
+      <div id="trackList" class="tracks-sec"></div>
+
+      <h3>Display</h3>
+      <label class="row">Note names
+        <select id="labelsSel">
+          <option value="letters">C D E</option>
+          <option value="octave">C4 D4 E4</option>
+          <option value="solfege">Do Re Mi</option>
+          <option value="off">Off</option>
+        </select>
+      </label>
+      <label class="row">Falling speed
+        <select id="windowSel">
+          <option value="4.5">Slow</option>
+          <option value="3">Normal</option>
+          <option value="2">Fast</option>
+        </select>
+      </label>
+      <label class="row">Your keyboard
+        <select id="rangeSel">
+          <option value="fit">Fit to song</option>
+          <option value="25">25 keys</option>
+          <option value="37">37 keys</option>
+          <option value="49">49 keys</option>
+          <option value="61">61 keys</option>
+          <option value="76">76 keys</option>
+          <option value="88">88 keys</option>
+        </select>
+      </label>
+      <p class="note">Pick your keyboard's size to see exactly its keys. Notes beyond it move an octave inside.</p>
+
+      <h3>Sound</h3>
+      <label class="row">Play sound on <select id="outputSel"></select></label>
+      <p class="note">Choose your keyboard to hear the song through its own speakers.</p>
+      <label class="row">Song volume <input type="range" id="songVol" min="0" max="1" step="0.05"></label>
+      <label class="row">Your volume <input type="range" id="myVol" min="0" max="1" step="0.05"></label>
+      <p class="note">Turn “Your volume” down if your keyboard has its own speakers.</p>
+    </aside>
+  </main>
+
+  <footer class="dock">
+    <div class="progress">
+      <span class="time" id="curTime">0:00</span>
+      <div class="seekwrap">
+        <div class="loopband" id="loopBand"></div>
+        <input type="range" id="seek" min="0" max="1" step="0.01" value="0">
+      </div>
+      <span class="time" id="durTime">0:00</span>
+    </div>
+    <div class="free-row">
+      <span class="free-title">Free Play</span>
+      <div class="oct">
+        <button class="ibtn sm" id="octDown" title="Octave down (↓)" aria-label="Octave down"><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
+        <span id="octLabel">C3 – G5</span>
+        <button class="ibtn sm" id="octUp" title="Octave up (↑)" aria-label="Octave up"><svg viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></svg></button>
+      </div>
+      <button class="chip" id="sustainBtn" title="Hold to sustain (or hold Space)">Sustain</button>
+      <button class="chip" id="clearTrails">Clear notes</button>
+    </div>
+    <div class="dock-row">
+      <div class="seg" id="modeSeg">
+        <button data-v="watch" title="Just listen and watch the notes">Listen</button>
+        <button data-v="practice" title="The song waits for you to play each note">Practice</button>
+        <button data-v="recital" title="Play in time, the song keeps going">Play along</button>
+      </div>
+      <div class="seg" id="handsSeg">
+        <button data-v="L" title="Only the left hand"><i class="hand-dot l"></i>Left hand</button>
+        <button data-v="both" title="Both hands">Both</button>
+        <button data-v="R" title="Only the right hand"><i class="hand-dot r"></i>Right hand</button>
+      </div>
+      <button class="chip" id="otherHandBtn" title="Hear the hand you are not playing">Other hand: on</button>
+      <div class="grow"></div>
+      <button class="chip" id="loopBtn">Loop A–B</button>
+      <button class="chip" id="sheetBtn" title="Sheet music">Sheet music</button>
+      <button class="chip" id="metroBtn" title="Metronome">Metronome</button>
+    </div>
+    <div class="hint" id="hint"></div>
+  </footer>
+</section>
+
+<div class="modal" id="upgradeDialog" role="dialog" aria-modal="true" aria-labelledby="upgradeTitle" hidden>
+  <div class="modal-card">
+    <button class="ibtn sm modal-x" id="upgradeClose" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <img class="modal-icon" src="icons/icon-192.png" alt="">
+    <div id="upgradeBody">
+      <h2 id="upgradeTitle">Remove ads forever</h2>
+      <p class="modal-sub">One payment of <b id="upgradePrice">$10</b>. No subscription, nothing more to pay, ever.</p>
+      <ul class="perks">
+        <li>No ads in the library or anywhere else</li>
+        <li>Works on this device right away</li>
+        <li>Supports new features and songs</li>
+      </ul>
+      <button class="btn lime big" id="buyBtn">Buy for <span>$10</span></button>
+      <p class="modal-note" id="buyNote" hidden>Checkout isn't set up yet (add the Lemon Squeezy link in js/config.js).</p>
+      <form class="licence" id="licenceForm">
+        <label for="licenceKey">Already bought it? Enter your licence key</label>
+        <div class="licence-row">
+          <input id="licenceKey" autocomplete="off" spellcheck="false" placeholder="XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX">
+          <button class="btn" id="activateBtn" type="submit">Activate</button>
+        </div>
+        <p class="modal-note" id="licenceMsg" aria-live="polite"></p>
+      </form>
+    </div>
+    <div id="upgradeDone" hidden>
+      <h2>Thank you!</h2>
+      <p class="modal-sub">Ads are removed on this device. Enjoy Piano Tutor.</p>
+    </div>
+  </div>
+</div>
+
+<div class="drop" id="drop">Drop MIDI files to add them</div>
+<div class="toast" id="toast"></div>
+
+<script type="module" src="js/app.js?v=13"></script>
+</body>
+</html>
