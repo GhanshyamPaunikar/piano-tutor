@@ -1,0 +1,78 @@
+{
+  "name": "piano-tutor",
+  "productName": "Piano Tutor",
+  "version": "1.0.0",
+  "description": "The easiest way to learn piano: falling notes, every key named, one hand at a time, works with any MIDI keyboard.",
+  "author": "Ghanshyam Paunikar",
+  "private": true,
+  "main": "desktop/main.js",
+  "scripts": {
+    "start": "electron .",
+    "smoke": "PIANO_TUTOR_SMOKE=1 electron .",
+    "screenshots": "PIANO_TUTOR_SCREENSHOTS=docs/screenshots electron .",
+    "dist": "electron-builder --mac --win",
+    "dist:mac": "electron-builder --mac",
+    "dist:win": "electron-builder --win",
+    "dist:personal": "electron-builder --mac --win -c desktop/personal.config.js"
+  },
+  "build": {
+    "appId": "com.ghanshyampaunikar.pianotutor",
+    "productName": "Piano Tutor",
+    "copyright": "Ghanshyam Paunikar",
+    "directories": {
+      "output": "dist",
+      "buildResources": "desktop/build"
+    },
+    "files": [
+      "index.html",
+      "style.css",
+      "js/**",
+      "vendor/**",
+      "samples/**",
+      "fonts/**",
+      "icons/**",
+      "starter/**",
+      "desktop/main.js",
+      "desktop/screenshots.js"
+    ],
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "category": "public.app-category.music",
+      "icon": "desktop/build/icon.png"
+    },
+    "dmg": {
+      "title": "Piano Tutor"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "desktop/build/icon.png",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "Piano Tutor",
+      "artifactName": "Piano-Tutor-Setup-${version}.${ext}"
+    },
+    "artifactName": "Piano-Tutor-${version}-${arch}.${ext}"
+  },
+  "devDependencies": {
+    "electron": "^44.7.0",
+    "electron-builder": "^26.15.3"
+  }
+}

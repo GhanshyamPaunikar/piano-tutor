@@ -1,0 +1,14 @@
+# Dependencies and build output
+node_modules/
+dist/
+
+# Private song collection and its lookup caches
+songs/
+tools/art_cache.json
+
+# Hosting settings
+.vercel/
+.vercelignore
+
+# System files
+.DS_Store

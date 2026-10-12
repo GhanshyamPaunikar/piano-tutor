@@ -1,0 +1,76 @@
+{
+ "songs": [
+  {
+   "file": "ode-to-joy.mid",
+   "title": "Ode to Joy",
+   "artist": "Ludwig van Beethoven",
+   "level": "Easy",
+   "genre": "Classical",
+   "dur": 16.0,
+   "bpm": 120,
+   "notes": 39,
+   "diff": 2,
+   "added": 1791811158
+  },
+  {
+   "file": "twinkle-twinkle.mid",
+   "title": "Twinkle Twinkle Little Star",
+   "artist": "Traditional",
+   "level": "Easy",
+   "genre": "Children's Music",
+   "dur": 28.8,
+   "bpm": 100,
+   "notes": 64,
+   "diff": 2,
+   "added": 1791811158
+  },
+  {
+   "file": "mary-had-a-little-lamb.mid",
+   "title": "Mary Had a Little Lamb",
+   "artist": "Traditional",
+   "level": "Easy",
+   "genre": "Children's Music",
+   "dur": 17.5,
+   "bpm": 110,
+   "notes": 34,
+   "diff": 1,
+   "added": 1791811158
+  },
+  {
+   "file": "jingle-bells.mid",
+   "title": "Jingle Bells",
+   "artist": "James Lord Pierpont",
+   "level": "Easy",
+   "genre": "Holiday",
+   "dur": 32.0,
+   "bpm": 120,
+   "notes": 67,
+   "diff": 2,
+   "added": 1791811158
+  },
+  {
+   "file": "fur-elise-opening.mid",
+   "title": "Für Elise (opening)",
+   "artist": "Ludwig van Beethoven",
+   "level": "Medium",
+   "genre": "Classical",
+   "dur": 6.8,
+   "bpm": 120,
+   "notes": 53,
+   "diff": 3,
+   "added": 1791811158
+  },
+  {
+   "file": "minuet-in-g.mid",
+   "title": "Minuet in G",
+   "artist": "Christian Petzold",
+   "level": "Easy",
+   "genre": "Classical",
+   "dur": 13.1,
+   "bpm": 110,
+   "notes": 42,
+   "diff": 2,
+   "added": 1791811158
+  }
+ ]
+}
