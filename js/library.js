@@ -111,6 +111,12 @@ const artOf = (e, size = 100) => {
   const a = e.art || twinOf(e).art;
   return a ? a.replace(/\/\d+x\d+bb\./, `/${size}x${size}bb.`) : '';
 };
+// Share of the song learned (best of left, right and both hands), 0 to 1
+const learnedShare = (e) => {
+  const p = L.prefs[e.id], dur = metaOf(e).dur;
+  if (!p || !p.learned || !dur) return 0;
+  return Math.min(1, Math.max(0, ...Object.values(p.learned)) / dur);
+};
 const genreOf = (e) => e.genre || twinOf(e).genre || '';
 const metaOf = (e) => e.meta || L.meta[e.id] || {};
 
@@ -527,15 +533,17 @@ function renderShelf() {
   if (ui.shelfCollapsed) return;
   for (const e of items) {
     const c = el('button', 'tile');
-    c.title = `Learn ${e.title}`;
-    c.onclick = () => hooks.onOpen(e, { mode: 'practice' });
+    c.title = `Continue learning ${e.title}`;
+    c.onclick = () => hooks.onOpen(e, { mode: 'practice', action: 'continue' });
     const info = el('span', 'tile-info');
     info.append(el('span', 'tile-t', e.title), el('span', 'tile-a', e.artist || e.folder || ''));
     const meta = el('span', 'tile-m');
     if (e.level) meta.append(levelBadge(e.level));
-    const p = L.plays[e.id];
-    if (p) meta.append(el('span', 'tile-ago', ago(p.last)));
+    const share = learnedShare(e);
+    if (share > 0) meta.append(el('span', 'tile-learned', share >= 0.99 ? 'Learned' : `${Math.round(share * 100)}% learned`));
+    else { const p = L.plays[e.id]; if (p) meta.append(el('span', 'tile-ago', ago(p.last))); }
     info.append(meta);
+    if (share > 0) { const bar = el('span', 'tile-bar'); bar.append(el('i')); bar.firstChild.style.width = `${share * 100}%`; info.append(bar); }
     c.append(artEl(e, 'tile-art', 150), info);
     row.append(c);
   }
@@ -916,6 +924,10 @@ function playlistItems(ids) {
 function songMenu(e, anchor) {
   const items = () => [
     { label: 'Learn both hands', hint: 'Enter', action: () => hooks.onOpen(e, { mode: 'practice', hands: 'both' }) },
+    ...(learnedShare(e) > 0 ? [
+      { label: 'Review learned part', action: () => hooks.onOpen(e, { mode: 'practice', action: 'review' }) },
+      { label: 'Continue learning', action: () => hooks.onOpen(e, { mode: 'practice', action: 'continue' }) },
+    ] : []),
     { label: 'Learn left hand only', hint: 'L', action: () => hooks.onOpen(e, { mode: 'practice', hands: 'L' }) },
     { label: 'Learn right hand only', hint: 'R', action: () => hooks.onOpen(e, { mode: 'practice', hands: 'R' }) },
     { label: 'Listen', action: () => hooks.onOpen(e, { mode: 'watch' }) },

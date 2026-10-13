@@ -9,7 +9,7 @@
 <link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png">
-<link rel="stylesheet" href="style.css?v=16">
+<link rel="stylesheet" href="style.css?v=17">
 <script src="vendor/tone.js"></script>
 <script src="vendor/midi.js"></script>
 <script src="vendor/vexflow.js"></script>
@@ -230,6 +230,10 @@
       <p class="note tracks-sec">Which hand plays each part. Background parts are always played for you.</p>
       <div id="trackList" class="tracks-sec"></div>
 
+      <h3 class="tracks-sec">Progress</h3>
+      <p class="note tracks-sec" id="learnedInfo"></p>
+      <button class="btn sm tracks-sec" id="resetLearned">Reset learned part</button>
+
       <h3>Display</h3>
       <label class="row">Note names
         <select id="labelsSel">
@@ -272,6 +276,7 @@
     <div class="progress">
       <span class="time" id="curTime">0:00</span>
       <div class="seekwrap">
+        <div class="learnband" id="learnBand"></div>
         <div class="loopband" id="loopBand"></div>
         <input type="range" id="seek" min="0" max="1" step="0.01" value="0">
       </div>
@@ -299,6 +304,14 @@
         <button data-v="R" title="Only the right hand"><i class="hand-dot r"></i>Right hand</button>
       </div>
       <button class="chip" id="otherHandBtn" title="Hear the hand you are not playing">Other hand: on</button>
+      <div class="learn-ctl" role="group" aria-label="Learned part">
+        <span class="learned-pct" id="learnedPct"></span>
+        <button class="chip" id="reviewBtn" title="Play from the start up to where you have learned, on repeat (Enter)">Review</button>
+        <button class="chip" id="continueBtn" title="Start one bar before where you stopped, to learn the next part (Shift+Enter)">Continue</button>
+        <button class="chip icon-chip" id="markBtn" title="Mark everything up to here as learned (K)" aria-label="Mark learned up to here">
+          <svg viewBox="0 0 24 24"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg>
+        </button>
+      </div>
       <div class="grow"></div>
       <button class="chip" id="loopBtn">Loop A–B</button>
       <button class="chip" id="sheetBtn" title="Sheet music">Sheet music</button>
@@ -341,6 +354,6 @@
 <div class="drop" id="drop">Drop MIDI files to add them</div>
 <div class="toast" id="toast"></div>
 
-<script type="module" src="js/app.js?v=13"></script>
+<script type="module" src="js/app.js?v=14"></script>
 </body>
 </html>

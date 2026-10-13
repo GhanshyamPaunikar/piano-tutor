@@ -24,6 +24,7 @@ Most people quit piano because the first months feel like homework. Piano Tutor 
 - **Every key is named.** Each falling note and every key on the piano shows its name (C, D, E or Do, Re, Mi), so you always know what to press.
 - **It waits for you.** In Practice mode the song pauses until you play the right note. Learn at your own speed, with zero pressure.
 - **One hand at a time.** Learn the right hand, then the left, then put them together. The app plays the other hand for you.
+- **It remembers how far you got.** Press Enter to replay everything you know from the start, or Shift+Enter to pick up where you stopped. That's how piano teachers build a song: review what you know, then add a little more.
 - **Any song you like.** Load any MIDI file or a whole folder of them. Thousands of MIDI songs are available online.
 - **Works with your keyboard.** Plug in any USB or Bluetooth MIDI keyboard. No keyboard yet? Play with your computer keys.
 - **Free.** Every feature is free. A small one-time payment removes the ads forever.
@@ -48,6 +49,7 @@ Most people quit piano because the first months feel like homework. Piano Tutor 
 | **Three ways to learn** | **Listen** to a song first, **Practice** with the song waiting for you, then **Play along** in real time. |
 | **Hands separately** | Left hand, right hand or both. Choose whether you hear the other hand or play in silence. |
 | **Tempo control** | Slow a song down to 50% and speed it back up as you improve. |
+| **Review what you know** | Piano Tutor tracks how far you have learned each song, for each hand. One key replays the song from the start up to that point, on repeat. Another starts a bar before where you stopped. |
 | **Loop any section** | Mark the bar you keep missing and repeat it until it sticks. |
 | **Sheet music** | A scrolling grand staff generated from the song, highlighting each note as it plays. |
 | **Metronome** | A gentle click on every beat, with an accent on the first. |
@@ -121,6 +123,9 @@ Press **Up** and **Down** to change octave. In Free Play, hold **Space** to sust
 | Player | `Space` | Play or pause |
 | Player | `Left` `Right` | Skip 5 seconds |
 | Player | `-` `=` | Slower or faster |
+| Player | `Enter` | Review: replay from the start to where you have learned |
+| Player | `Shift Enter` | Continue learning from where you stopped |
+| Player | `K` | Mark everything up to here as learned |
 | Anywhere | `Esc` | Back, close or clear |
 
 ## Free, with an option to remove ads
@@ -156,6 +161,7 @@ npm install            # once
 npm start              # run the desktop app
 npm run dist           # build the Mac (.dmg) and Windows (.exe) installers into dist/
 npm run screenshots    # retake the screenshots in docs/screenshots
+PIANO_TUTOR_EVAL=test.js npx electron .   # run a test script inside the hidden app and print its result
 python3 serve.py       # run the web version at http://localhost:5173
 ```
 

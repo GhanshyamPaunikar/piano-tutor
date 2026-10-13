@@ -24,6 +24,10 @@ const S = {
   mode: 'practice',     // watch | practice | recital
   hands: 'both',        // L | R | both
   loopA: null, loopB: null,
+  learnedMap: {},       // how far you've learned this song, per hand choice: { both, L, R } in seconds
+  review: false,        // replaying start -> learned point
+  runOk: false,         // this run started inside the learned part (no skipping ahead)
+  extHit: 0, extMiss: 0, // notes beyond the learned point in this run (Play along)
   lo: 48, hi: 83,
   learn: [],            // notes the player plays, sorted by time
   state: new Uint8Array(0), // per learn note: 0 pending, 1 hit, 2 missed
@@ -57,6 +61,8 @@ async function openEntry(entry, opts = {}) {
     setSong(song, opts);
     recordPlay(entry.id);
     showPlayer(true);
+    if (opts.action === 'review') startReview();
+    else if (opts.action === 'continue') continueLearning();
     const hash = '#/play/' + encodeURIComponent(entry.id);
     if (location.hash !== hash) location.hash = hash;
   } catch (err) {
@@ -71,6 +77,8 @@ function setSong(song, opts = {}) {
   S.speed = 1;
 
   const p = getSongPrefs(song.id);
+  S.learnedMap = { ...((p && p.learned) || {}) };
+  S.review = false;
   if (p) {
     if (p.hands && p.hands.length === song.tracks.length) song.tracks.forEach((t, i) => { t.hand = p.hands[i]; });
     S.mode = p.mode || S.mode;
@@ -98,11 +106,12 @@ function setSong(song, opts = {}) {
   syncSegs();
   updateLoopUI();
   renderTracks();
+  renderLearned();
 }
 
 function saveSongSettings() {
   if (!S.song) return;
-  setSongPrefs(S.song.id, { hands: S.song.tracks.map((t) => t.hand), mode: S.mode, practiceHands: S.hands, speed: S.speed });
+  setSongPrefs(S.song.id, { hands: S.song.tracks.map((t) => t.hand), mode: S.mode, practiceHands: S.hands, speed: S.speed, learned: S.learnedMap });
 }
 
 // Keyboard sizes people own, with their usual lowest and highest keys
@@ -169,6 +178,104 @@ function resetRun(t) {
   S.waitIdx = lowerBound(S.learn, t - 0.001);
   S.judgeIdx = S.waitIdx;
   S.chord = null;
+  S.runOk = t <= learned() + 0.05;
+  S.extFrom = learned(); // notes after this point are new in this run
+  S.extHit = S.extMiss = 0;
+}
+
+/* ================= learned part: review from the start, continue from where you stopped ================= */
+
+const learned = () => (S.song ? S.learnedMap[S.hands] || 0 : 0);
+let lastSavedLearned = 0;
+
+function setLearned(t, save) {
+  S.learnedMap[S.hands] = Math.max(0, Math.min(t, S.song.duration));
+  if (save || Math.abs(S.learnedMap[S.hands] - lastSavedLearned) >= 1) { lastSavedLearned = S.learnedMap[S.hands]; saveSongSettings(); }
+  renderLearned();
+}
+
+// The learned point moves forward as you play past it, but only when this run started inside the learned
+// part: Practice waits for every note, so reaching a point means you played it; Play along needs 80% of the new notes.
+function extendLearned(t) {
+  const cur = learned();
+  if (t <= cur || !S.runOk || S.mode === 'watch' || !S.learn.length) return;
+  if (S.mode === 'recital') {
+    // Only count up to notes that have already been judged as hit or missed
+    if (S.judgeIdx < S.learn.length) t = Math.min(t, S.learn[S.judgeIdx].time - 0.01);
+    const total = S.extHit + S.extMiss;
+    if (t <= cur || (total && S.extMiss / total > 0.2)) return;
+  }
+  const done = t >= S.song.duration - 0.05 && cur < S.song.duration - 0.05;
+  setLearned(t);
+  if (done) { saveSongSettings(); toast('You learned the whole song! Press Enter to play it all from the start.'); }
+}
+
+// End of the bar that contains the learned point
+function learnedEnd() {
+  const l = learned();
+  if (l <= 0) return 0;
+  const m = S.song.measures.find((x) => x >= l - 0.01);
+  return Math.min(S.song.duration, m === undefined ? S.song.duration : m);
+}
+
+function startReview() {
+  if (!S.song) return;
+  if (S.review) { stopReview(); return; }
+  if (learned() <= 0) { toast('Nothing learned yet. Practise from the start, or press K to mark how far you know it.'); return; }
+  S.loopA = -LEAD_IN;
+  S.loopB = learnedEnd();
+  S.review = true;
+  seek(S.loopA);
+  updateLoopUI();
+  renderLearned();
+  play();
+  toast(`Reviewing everything you know: 0:00 to ${fmt(S.loopB)}`);
+}
+
+function stopReview() {
+  S.review = false;
+  S.loopA = S.loopB = null;
+  updateLoopUI();
+  renderLearned();
+}
+
+// Start one bar before where you stopped, to learn the next part
+function continueLearning() {
+  if (!S.song) return;
+  if (S.review || S.loopA != null) { S.review = false; S.loopA = S.loopB = null; updateLoopUI(); }
+  const l = learned();
+  let start = -LEAD_IN;
+  if (l > 0) {
+    const ms = S.song.measures;
+    let j = 0;
+    while (j + 1 < ms.length && ms[j + 1] <= l) j++;
+    start = j > 0 ? ms[j - 1] : -LEAD_IN;
+  }
+  seek(start);
+  renderLearned();
+  play();
+}
+
+function markLearned() {
+  if (!S.song) return;
+  if (S.t <= 0.05) { setLearned(0, true); toast('Learned part cleared for this hand choice'); return; }
+  setLearned(S.t, true);
+  toast(`Marked as learned up to ${fmt(S.t)}. Press Enter to review it from the start.`);
+}
+
+function renderLearned() {
+  if (!S.song) return;
+  const l = learned(), dur = S.song.duration;
+  const pct = Math.round((l / dur) * 100);
+  $('#learnBand').style.width = `${(l / dur) * 100}%`;
+  const rb = $('#reviewBtn');
+  rb.disabled = l <= 0 && !S.review;
+  rb.classList.toggle('on', S.review);
+  rb.textContent = S.review ? 'Stop review' : l > 0 ? `Review 0:00 to ${fmt(learnedEnd())}` : 'Review';
+  $('#learnedPct').textContent = l > 0 ? `${pct}% learned` : 'Not started';
+  $('#learnedInfo').textContent = l > 0
+    ? `You know this song up to ${fmt(l)} of ${fmt(dur)} (${pct}%) with ${S.hands === 'both' ? 'both hands' : S.hands === 'L' ? 'the left hand' : 'the right hand'}.`
+    : 'Nothing learned yet for this hand choice.';
 }
 
 /* ================= playback ================= */
@@ -236,6 +343,7 @@ function advance(dt) {
   }
 
   S.t = next;
+  extendLearned(S.t);
   if (S.loopB != null && S.t >= S.loopB) seek(S.loopA);
   else if (S.t >= song.duration) finish();
 }
@@ -246,9 +354,13 @@ function advance(dt) {
 function hit(i) {
   if (S.state[i]) return;
   S.state[i] = 1;
+  if (S.learn[i].time > S.extFrom) S.extHit++;
   spark(S.learn[i].k, colorOf(S.learn[i]));
 }
-function miss(i) { S.state[i] = 2; }
+function miss(i) {
+  S.state[i] = 2;
+  if (S.learn[i].time > S.extFrom) S.extMiss++;
+}
 const colorOf = (n) => HAND_COLORS[S.song.tracks[n.track].hand] || HAND_COLORS.bg;
 
 // Called when the player presses a key. Returns the colour to light that key.
@@ -285,6 +397,7 @@ function judge(m) {
 
 function finish() {
   pause();
+  saveSongSettings();
 }
 
 function spark(m, color) {
@@ -432,7 +545,7 @@ function updateHint() {
     recital: 'Play along: play in time, the song keeps going.',
   }[S.mode];
   const keys = midiConnected ? '' : ` · Computer keys <kbd>Z</kbd>–<kbd>/</kbd> and <kbd>Q</kbd>–<kbd>]</kbd> play from ${noteName(kbBase)}, <kbd>↑</kbd> <kbd>↓</kbd> octave`;
-  $('#hint').innerHTML = `${modeHint}${keys} · <kbd>Space</kbd> play/pause · <kbd>←</kbd> <kbd>→</kbd> skip · <kbd>-</kbd> <kbd>=</kbd> tempo`;
+  $('#hint').innerHTML = `${modeHint}${keys} · <kbd>Space</kbd> play/pause · <kbd>←</kbd> <kbd>→</kbd> skip · <kbd>-</kbd> <kbd>=</kbd> tempo · <kbd>Enter</kbd> review learned part · <kbd>Shift</kbd>+<kbd>Enter</kbd> continue · <kbd>K</kbd> mark learned`;
 }
 
 window.addEventListener('keydown', (e) => {
@@ -454,6 +567,10 @@ window.addEventListener('keydown', (e) => {
   }
   if (e.target.type === 'range' && e.code.startsWith('Arrow')) return;
   if (e.code === 'ArrowUp' || e.code === 'ArrowDown') { e.preventDefault(); shiftOctave(e.code === 'ArrowUp' ? 1 : -1); return; }
+  if (!S.free && S.song) {
+    if (e.code === 'Enter' && !/BUTTON|A/.test(e.target.tagName)) { e.preventDefault(); if (e.shiftKey) continueLearning(); else startReview(); return; }
+    if (e.code === 'KeyK' && !e.repeat) { markLearned(); return; }
+  }
   if (e.code === 'ArrowLeft') { seek(S.t - 5); return; }
   if (e.code === 'ArrowRight') { seek(S.t + 5); return; }
   if (e.code === 'Minus' || e.code === 'Equal') {
@@ -609,6 +726,19 @@ function draw(now, dt) {
       ctx.fillStyle = '#3e4656';
       ctx.fillText(String(i + 1), 14, y - 4);
     });
+
+    // Where you've learned up to
+    if (S.mode !== 'watch' && learned() > 0) {
+      const y = yOf(learned());
+      if (y >= 0 && y <= rollH) {
+        ctx.fillStyle = 'rgba(60,207,142,0.85)';
+        ctx.fillRect(0, Math.round(y) - 1, w, 2);
+        ctx.font = '600 11px Inter, system-ui, sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText('Learned up to here', w - 12, y - 6);
+        ctx.textAlign = 'left';
+      }
+    }
 
     // Loop markers
     ctx.fillStyle = 'rgba(79,123,255,0.7)';
@@ -867,6 +997,7 @@ function showPlayer(show) {
   if (show && !S.song && !S.free) return;
   if (!show) {
     pause();
+    if (S.song && !S.free) saveSongSettings();
     $('#settings').hidden = true;
     if (document.fullscreenElement) document.exitFullscreen();
     if (location.hash.startsWith('#/play/') || location.hash === '#/free') location.hash = lastLibraryHash;
@@ -961,7 +1092,11 @@ $$('#modeSeg button').forEach((b) => {
   b.onclick = () => { S.mode = b.dataset.v; applyRoles(); seek(S.t); syncSegs(); saveSongSettings(); };
 });
 $$('#handsSeg button').forEach((b) => {
-  b.onclick = () => { S.hands = b.dataset.v; applyRoles(); seek(S.t); syncSegs(); saveSongSettings(); };
+  b.onclick = () => {
+    S.hands = b.dataset.v;
+    if (S.review) { S.review = false; S.loopA = S.loopB = null; updateLoopUI(); }
+    applyRoles(); seek(S.t); syncSegs(); saveSongSettings(); renderLearned();
+  };
 });
 $('#otherHandBtn').onclick = () => { prefs.otherHand = !prefs.otherHand; savePrefs(); applyRoles(); seek(S.t); syncSegs(); };
 
@@ -1007,6 +1142,7 @@ function updateLoopUI() {
 
 $('#loopBtn').onclick = () => {
   if (!S.song) return;
+  if (S.review) { stopReview(); return; }
   if (S.loopA == null) S.loopA = Math.max(0, S.t);
   else if (S.loopB == null) {
     if (S.t <= S.loopA + 0.25) { toast('Play or skip past point A first'); return; }
@@ -1021,6 +1157,11 @@ $('#playBtn').onclick = togglePlay;
 $('#restartBtn').onclick = () => seek(S.loopA ?? -LEAD_IN);
 $('#backBtn').onclick = () => showPlayer(false);
 $('#songPick').onclick = () => showPlayer(false);
+$('#reviewBtn').onclick = startReview;
+$('#continueBtn').onclick = continueLearning;
+$('#markBtn').onclick = markLearned;
+$('#resetLearned').onclick = () => { if (S.song) { setLearned(0, true); toast('Learned part cleared for this hand choice'); } };
+window.addEventListener('beforeunload', () => { if (S.song && !S.free) saveSongSettings(); });
 $('#octDown').onclick = () => shiftOctave(-1);
 $('#octUp').onclick = () => shiftOctave(1);
 $('#sustainBtn').addEventListener('pointerdown', () => setSustain(true));
