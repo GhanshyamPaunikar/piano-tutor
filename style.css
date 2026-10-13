@@ -688,3 +688,17 @@ input[type=range]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 
 .licence-row input:focus { border-color: var(--accent); }
 
 .size-chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 20px 20px; }
+
+/* ---------- learned part ---------- */
+.learnband {
+  position: absolute; left: 0; top: 50%; height: 4px; width: 0; transform: translateY(-50%);
+  border-radius: 2px; background: var(--e-easy, #3ccf8e); opacity: .85; pointer-events: none;
+}
+.learn-ctl { display: flex; align-items: center; gap: 6px; }
+.learned-pct { font-size: 12.5px; color: #4fdca0; margin-right: 4px; white-space: nowrap; }
+.chip:disabled { opacity: .45; cursor: default; }
+.icon-chip { width: 32px; padding: 0; display: grid; place-items: center; }
+.icon-chip svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.tile-learned { color: #4fdca0; }
+.tile-bar { display: block; height: 3px; margin-top: 6px; border-radius: 2px; background: var(--line-strong); overflow: hidden; }
+.tile-bar i { display: block; height: 100%; background: #3ccf8e; }

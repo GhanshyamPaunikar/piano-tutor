@@ -9,7 +9,8 @@ const SCHEME = 'app';
 const HOST = 'piano-tutor';
 
 // Test runs (health check, README screenshots) use a throwaway profile so they never touch your real data
-if (process.env.PIANO_TUTOR_SMOKE || process.env.PIANO_TUTOR_SCREENSHOTS) {
+const TEST_RUN = process.env.PIANO_TUTOR_SMOKE || process.env.PIANO_TUTOR_SCREENSHOTS || process.env.PIANO_TUTOR_EVAL;
+if (TEST_RUN) {
   app.setPath('userData', path.join(require('os').tmpdir(), `piano-tutor-test-${process.pid}`));
 }
 
@@ -44,9 +45,10 @@ function createWindow() {
     backgroundColor: '#0a0e15',
     autoHideMenuBar: true,
     show: false,
-    webPreferences: { contextIsolation: true, sandbox: true },
+    // Hidden test windows must keep animating, so throttling is off for them
+    webPreferences: { contextIsolation: true, sandbox: true, backgroundThrottling: !TEST_RUN },
   });
-  const headless = process.env.PIANO_TUTOR_SMOKE || process.env.PIANO_TUTOR_SCREENSHOTS;
+  const headless = TEST_RUN;
   win.once('ready-to-show', () => { if (!headless) win.show(); });
 
   // Links that leave the app open in the normal browser
@@ -58,7 +60,7 @@ function createWindow() {
     if (!url.startsWith(`${SCHEME}://${HOST}/`)) { e.preventDefault(); if (/^https?:/.test(url)) shell.openExternal(url); }
   });
 
-  const query = process.env.PIANO_TUTOR_SCREENSHOTS ? '?edition=public' : '';
+  const query = process.env.PIANO_TUTOR_SCREENSHOTS || process.env.PIANO_TUTOR_EVAL ? '?edition=public' : '';
   win.loadURL(`${SCHEME}://${HOST}/index.html${query}#/library`);
   return win;
 }
@@ -96,6 +98,18 @@ app.whenReady().then(async () => {
       app.quit();
     });
     win.webContents.on('console-message', (e) => { if (e.level === 'error') console.log('CONSOLE ERROR', e.message); });
+  }
+
+  // `PIANO_TUTOR_EVAL=path/to/test.js electron .` runs that script in the app (public edition) and prints its result
+  if (process.env.PIANO_TUTOR_EVAL) {
+    win.setSize(1440, 900);
+    win.webContents.once('did-finish-load', async () => {
+      await new Promise((r) => setTimeout(r, 2500));
+      const code = require('fs').readFileSync(path.resolve(process.env.PIANO_TUTOR_EVAL), 'utf8');
+      try { console.log('RESULT', JSON.stringify(await win.webContents.executeJavaScript(code), null, 1)); }
+      catch (err) { console.log('TEST ERROR', err.message); }
+      app.quit();
+    });
   }
 
   if (process.env.PIANO_TUTOR_SCREENSHOTS) {
