@@ -9,7 +9,7 @@
 <link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png">
-<link rel="stylesheet" href="style.css?v=17">
+<link rel="stylesheet" href="style.css?v=18">
 <script src="vendor/tone.js"></script>
 <script src="vendor/midi.js"></script>
 <script src="vendor/vexflow.js"></script>
@@ -230,6 +230,21 @@
       <p class="note tracks-sec">Which hand plays each part. Background parts are always played for you.</p>
       <div id="trackList" class="tracks-sec"></div>
 
+      <h3 class="tracks-sec">Key</h3>
+      <div class="row tracks-sec key-row">
+        <span id="keyInfo">Original key</span>
+        <span class="stepper">
+          <button class="btn sm" id="keyDown" title="Down a semitone" aria-label="Down a semitone">−</button>
+          <b id="keyVal">0</b>
+          <button class="btn sm" id="keyUp" title="Up a semitone" aria-label="Up a semitone">+</button>
+        </span>
+      </div>
+      <div class="key-acts tracks-sec">
+        <button class="btn sm" id="keyEasy" title="Pick the key with the fewest black keys">Easiest key</button>
+        <button class="btn sm ghost" id="keyReset">Original key</button>
+      </div>
+      <p class="note tracks-sec">Move the song up or down to make it easier to play or to fit your keyboard.</p>
+
       <h3 class="tracks-sec">Progress</h3>
       <p class="note tracks-sec" id="learnedInfo"></p>
       <button class="btn sm tracks-sec" id="resetLearned">Reset learned part</button>
@@ -241,6 +256,12 @@
           <option value="octave">C4 D4 E4</option>
           <option value="solfege">Do Re Mi</option>
           <option value="off">Off</option>
+        </select>
+      </label>
+      <label class="row">Finger numbers
+        <select id="fingersSel">
+          <option value="on">Show</option>
+          <option value="off">Hide</option>
         </select>
       </label>
       <label class="row">Falling speed
@@ -293,6 +314,7 @@
       </div>
       <button class="chip" id="sustainBtn" title="Hold to sustain (or hold Space)">Sustain</button>
       <button class="chip" id="clearTrails">Clear notes</button>
+      <button class="chip rec-btn" title="Record what you play"><i class="rec-dot"></i><span>Record</span></button>
     </div>
     <div class="dock-row">
       <div class="seg" id="modeSeg">
@@ -315,6 +337,8 @@
         </button>
       </div>
       <div class="grow"></div>
+      <button class="chip rec-btn" title="Record what you play"><i class="rec-dot"></i><span>Record</span></button>
+      <button class="chip" id="saveRecBtn" title="Save this recording as a MIDI file" hidden>Save MIDI file</button>
       <button class="chip" id="loopBtn">Loop A–B</button>
       <button class="chip" id="sheetBtn" title="Sheet music">Sheet music</button>
       <button class="chip" id="metroBtn" title="Metronome">Metronome</button>
@@ -322,6 +346,21 @@
     <div class="hint" id="hint"></div>
   </footer>
 </section>
+
+<div class="modal" id="tour" role="dialog" aria-modal="true" aria-labelledby="tourTitle" hidden>
+  <div class="modal-card tour-card">
+    <button class="ibtn sm modal-x" id="tourClose" aria-label="Skip the tour"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <div class="tour-step" id="tourStepLabel"></div>
+    <h2 id="tourTitle"></h2>
+    <p class="modal-sub" id="tourText"></p>
+    <div id="tourExtra"></div>
+    <div class="tour-foot">
+      <div class="tour-dots" id="tourDots"></div>
+      <button class="btn sm ghost" id="tourBack">Back</button>
+      <button class="btn sm primary" id="tourNext">Next</button>
+    </div>
+  </div>
+</div>
 
 <div class="modal" id="upgradeDialog" role="dialog" aria-modal="true" aria-labelledby="upgradeTitle" hidden>
   <div class="modal-card">
@@ -356,6 +395,6 @@
 <div class="drop" id="drop">Drop MIDI files to add them</div>
 <div class="toast" id="toast"></div>
 
-<script type="module" src="js/app.js?v=14"></script>
+<script type="module" src="js/app.js?v=15"></script>
 </body>
 </html>

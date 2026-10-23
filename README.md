@@ -54,8 +54,13 @@ Most people quit piano because the first months feel like homework. Piano Tutor 
 | **Sheet music** | A scrolling grand staff generated from the song, highlighting each note as it plays. |
 | **Metronome** | A gentle click on every beat, with an accent on the first. |
 | **Keyboard sizes** | 25, 37, 49, 61, 76 or 88 keys. Notes beyond your keyboard move an octave inside it, so every song fits. |
+| **Finger numbers** | Every falling note shows which finger to use (1 = thumb … 5 = little finger), worked out for each song. |
+| **Change the key** | Move a song up or down by semitones, or press Easiest key for the version with the fewest black keys. |
+| **Record yourself** | Record what you play, then watch it back as falling notes. Recordings are saved with your songs and as MIDI files. |
 | **Sound on your keyboard** | Send the song to your digital piano's speakers instead of the computer. |
+| **Choose a tone** | Grand piano, electric piano, organ, strings, synth or music box, or let your keyboard use the tone set on its own panel. |
 | **Sustain pedal** | Your keyboard's sustain pedal just works. |
+| **Welcome tour** | A three-step tour on first start: connect your keyboard, pick a song, practise. |
 | **Previews** | Click any song to hear 30 seconds before you start. |
 | **Your music folder** | Point Piano Tutor at a folder of MIDI files once. It remembers it and reads every subfolder. |
 | **Works offline** | The desktop app and its piano sound need no internet connection. |

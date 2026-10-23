@@ -1,9 +1,10 @@
 // Piano Tutor: the player. Falling notes, keyboard input, practice modes and scoring.
 import { $, $$, el, fmt, isBlack, lowerBound, noteName, NOTE_NAMES, SOLFEGE, toast } from './util.js';
-import { parseMidi, HAND_COLORS, HAND_GRADIENTS, HAND_NAMES } from './song.js';
+import { parseMidi, midiClass, HAND_COLORS, HAND_GRADIENTS, HAND_NAMES } from './song.js';
 import * as audio from './audio.js';
 import { initMonetize } from './monetize.js';
 import { createSheet } from './sheet.js';
+import { fingerSong } from './fingering.js';
 import { initLibrary, addFiles, recordPlay, getSongPrefs, setSongPrefs, nextEntry, entryById, hasCollection, libraryHash, renderDevices, refreshPreview, render as renderLibrary } from './library.js';
 
 const LEAD_IN = 2;   // seconds of empty roll before the first note
@@ -13,7 +14,7 @@ const BAD = '#ff5d6c', FREE = '#9aa8bb', MISSED = '#2a303b';
 const SPEEDS = [0.5, 0.6, 0.7, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5];
 
 const prefs = Object.assign(
-  { labels: 'letters', sheet: false, metronome: false, songVol: 0.8, myVol: 0.9, range: 'fit', window: 3, otherHand: true, output: '', tone: 'piano', keyTone: 'keyboard' },
+  { labels: 'letters', sheet: false, metronome: false, songVol: 0.8, myVol: 0.9, range: 'fit', window: 3, otherHand: true, output: '', tone: 'piano', keyTone: 'keyboard', fingers: true },
   (() => { try { return JSON.parse(localStorage.getItem('keys.prefs')) || {}; } catch { return {}; } })(),
 );
 const savePrefs = () => { try { localStorage.setItem('keys.prefs', JSON.stringify(prefs)); } catch { /* private mode */ } };
@@ -35,6 +36,7 @@ const S = {
   chord: null, waiting: false,
   pressed: new Map(),   // midi -> key colour while held
   sparks: [],
+  transpose: 0,         // semitones the song is moved up or down
   free: false,          // Free Play: no song, just the piano
   trails: [],           // Free Play: notes rising from the keys
 };
@@ -59,6 +61,7 @@ async function openEntry(entry, opts = {}) {
     S.entry = entry;
     $('#player').classList.remove('free');
     setSong(song, opts);
+    syncRec();
     recordPlay(entry.id);
     showPlayer(true);
     if (opts.action === 'review') startReview();
@@ -85,6 +88,9 @@ function setSong(song, opts = {}) {
     S.hands = p.practiceHands || S.hands;
     S.speed = p.speed || 1;
   }
+  for (const n of song.notes) n.midi0 = n.midi;
+  song.key0 = song.key;
+  applyTranspose(song, (p && p.transpose) || 0);
   if (opts.mode) S.mode = opts.mode;
   if (opts.hands) S.hands = opts.hands;
   if (S.hands !== 'both' && !song.tracks.some((t) => t.hand === S.hands)) {
@@ -93,6 +99,7 @@ function setSong(song, opts = {}) {
   }
 
   pause();
+  fingerSong(song);
   fitRange();
   applyRoles();
   seek(-LEAD_IN);
@@ -107,12 +114,69 @@ function setSong(song, opts = {}) {
   updateLoopUI();
   renderTracks();
   renderLearned();
+  renderKey();
 }
 
 function saveSongSettings() {
   if (!S.song) return;
-  setSongPrefs(S.song.id, { hands: S.song.tracks.map((t) => t.hand), mode: S.mode, practiceHands: S.hands, speed: S.speed, learned: S.learnedMap });
+  setSongPrefs(S.song.id, { hands: S.song.tracks.map((t) => t.hand), mode: S.mode, practiceHands: S.hands, speed: S.speed, learned: S.learnedMap, transpose: S.transpose });
 }
+
+/* ================= key: move the whole song up or down ================= */
+
+const SEMI = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+const MAJOR_KEYS = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
+const MINOR_KEYS = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'G#', 'A', 'Bb', 'B'];
+function shiftKey(key, d) {
+  if (!key || !(key.key[0] in SEMI)) return key;
+  const root = SEMI[key.key[0]] + (key.key[1] === '#' ? 1 : key.key[1] === 'b' ? -1 : 0);
+  const i = (((root + d) % 12) + 12) % 12;
+  return { key: (key.scale === 'minor' ? MINOR_KEYS : MAJOR_KEYS)[i], scale: key.scale };
+}
+const keyName = (key) => (key ? `${key.key} ${key.scale === 'minor' ? 'minor' : 'major'}` : '');
+
+function applyTranspose(song, d) {
+  S.transpose = Math.max(-12, Math.min(12, d));
+  for (const n of song.notes) n.midi = Math.max(21, Math.min(108, n.midi0 + S.transpose));
+  song.key = shiftKey(song.key0, S.transpose);
+}
+
+function setTranspose(d) {
+  if (!S.song) return;
+  applyTranspose(S.song, d);
+  fingerSong(S.song);
+  fitRange();
+  applyRoles();
+  seek(S.t);
+  if (prefs.sheet) sheet.render(S.song);
+  renderKey();
+  saveSongSettings();
+}
+
+// The shift (within half an octave) that puts the fewest of your notes on black keys
+function easiestKey() {
+  const mine = S.song.notes.filter((n) => S.song.tracks[n.track].hand === 'R' || S.song.tracks[n.track].hand === 'L');
+  let best = 0, bestCount = Infinity;
+  for (const d of [0, -1, 1, -2, 2, -3, 3, -4, 4, -5, 5, 6]) {
+    const c = mine.reduce((s, n) => s + (isBlack(n.midi0 + d) ? 1 : 0), 0);
+    if (c < bestCount) { best = d; bestCount = c; }
+  }
+  setTranspose(best);
+  toast(best ? `Moved ${Math.abs(best)} semitone${Math.abs(best) > 1 ? 's' : ''} ${best > 0 ? 'up' : 'down'}: ${bestCount} black-key notes left` : 'This song is already in its easiest key');
+}
+
+function renderKey() {
+  if (!S.song) return;
+  const d = S.transpose;
+  $('#keyVal').textContent = d > 0 ? `+${d}` : String(d);
+  const from = keyName(S.song.key0), to = keyName(S.song.key);
+  $('#keyInfo').textContent = !d ? (from ? `Original key: ${from}` : 'Original key')
+    : from ? `${to} (from ${from})` : `${Math.abs(d)} semitone${Math.abs(d) > 1 ? 's' : ''} ${d > 0 ? 'up' : 'down'}`;
+}
+$('#keyDown').onclick = () => setTranspose(S.transpose - 1);
+$('#keyUp').onclick = () => setTranspose(S.transpose + 1);
+$('#keyReset').onclick = () => setTranspose(0);
+$('#keyEasy').onclick = () => S.song && easiestKey();
 
 // Keyboard sizes people own, with their usual lowest and highest keys
 const KEYBOARDS = { 25: [48, 72], 37: [48, 84], 49: [36, 84], 61: [36, 96], 76: [28, 103], 88: [21, 108] };
@@ -422,6 +486,7 @@ function noteOn(m, vel = 0.75, fromKeyboard = false) {
   sounding.set(m, audio.myNoteOn(m, vel, fromKeyboard));
   sustained.delete(m);
   lastNote = noteName(m);
+  recNoteOn(m, vel);
   if (S.free) {
     const color = `hsl(${(m % 12) * 30} 72% 62%)`;
     S.trails.push({ m, t0: performance.now(), t1: 0, color });
@@ -431,6 +496,7 @@ function noteOn(m, vel = 0.75, fromKeyboard = false) {
 }
 
 function noteOff(m) {
+  recNoteOff(m);
   S.pressed.delete(m);
   for (const tr of S.trails) if (tr.m === m && !tr.t1) tr.t1 = performance.now();
   if (sustain) { sustained.add(m); return; }
@@ -439,12 +505,85 @@ function noteOff(m) {
 }
 
 function setSustain(down) {
+  if (down !== sustain && rec) rec.cc.push({ time: recNow(), value: down ? 1 : 0 });
   sustain = down;
   if (!down) {
     for (const m of sustained) if (!S.pressed.has(m)) { audio.myNoteOff(sounding.get(m), m); sounding.delete(m); }
     sustained.clear();
   }
 }
+
+/* ================= recording what you play ================= */
+
+const REC_PREFIX = 'My recording ';
+let rec = null; // { t0, open: Map midi -> { time, vel }, notes: [], cc: [] }
+const recNow = () => (performance.now() - rec.t0) / 1000;
+
+function recNoteOn(m, vel) {
+  if (!rec) return;
+  recNoteOff(m);
+  rec.open.set(m, { time: recNow(), vel });
+}
+function recNoteOff(m) {
+  const o = rec && rec.open.get(m);
+  if (!o) return;
+  rec.open.delete(m);
+  rec.notes.push({ midi: m, time: o.time, duration: Math.max(0.05, recNow() - o.time), velocity: o.vel });
+}
+
+function startRecording() {
+  audio.unlock();
+  rec = { t0: performance.now(), open: new Map(), notes: [], cc: [] };
+  if (sustain) rec.cc.push({ time: 0, value: 1 });
+  syncRec();
+  toast('Recording. Play something, then press Stop.');
+}
+
+async function stopRecording() {
+  for (const m of [...rec.open.keys()]) recNoteOff(m);
+  const { notes, cc } = rec;
+  rec = null;
+  syncRec();
+  if (!notes.length) { toast('Nothing was played, so nothing was saved'); return; }
+  // Start half a second before the first note
+  const shift = Math.max(0, Math.min(...notes.map((n) => n.time)) - 0.5);
+  const Midi = midiClass();
+  const midi = new Midi();
+  midi.header.setTempo(120);
+  const tr = midi.addTrack();
+  tr.name = 'Piano';
+  for (const n of notes) tr.addNote({ ...n, time: n.time - shift });
+  for (const c of cc) tr.addCC({ number: 64, value: c.value, time: Math.max(0, c.time - shift) });
+  const d = new Date(), p2 = (x) => String(x).padStart(2, '0');
+  const name = `${REC_PREFIX}${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())} ${p2(d.getHours())}.${p2(d.getMinutes())}.${p2(d.getSeconds())}.mid`;
+  const file = new File([midi.toArray()], name, { type: 'audio/midi' });
+  // Lands in your songs and opens in Listen mode, so you watch and hear yourself back
+  await addFiles([file], { mode: 'watch', hands: 'both' });
+  if (S.entry && S.entry.id === 'u:' + name) { seek(-LEAD_IN); play(); }
+  toast('Saved to your songs. Playing it back…');
+}
+
+function syncRec() {
+  $$('.rec-btn').forEach((b) => {
+    b.classList.toggle('recording', !!rec);
+    b.lastChild.textContent = rec ? 'Stop' : 'Record';
+    b.title = rec ? 'Stop recording and play it back' : 'Record what you play';
+  });
+  $('#saveRecBtn').hidden = !(S.entry && S.entry.id.startsWith('u:' + REC_PREFIX));
+}
+$$('.rec-btn').forEach((b) => { b.onclick = () => (rec ? stopRecording() : startRecording()); });
+
+$('#saveRecBtn').onclick = async () => {
+  if (!S.entry) return;
+  const blob = await S.entry.file();
+  const a = el('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = S.entry.id.slice(2);
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+};
 
 let midiAccess = null, midiConnected = false, lastNote = '';
 function midiState() {
@@ -782,7 +921,8 @@ function draw(now, dt) {
 
     const chord = S.mode === 'practice' ? S.chord : null;
     const nextSet = chord ? new Set(chord.idx.filter((i) => chord.need.has(S.learn[i].k)).map((i) => S.learn[i])) : null;
-    const minH = showLabels ? 20 : 6;
+    const fingers = prefs.fingers;
+    const minH = (showLabels ? 20 : 6) + (fingers ? 18 : 0);
 
     for (let i = lowerBound(song.notes, t - 10); i < song.notes.length; i++) {
       const n = song.notes[i];
@@ -824,6 +964,23 @@ function draw(now, dt) {
         rrect(x, top, bw, hgt, r); ctx.stroke();
       }
 
+      // Suggested finger in a small badge at the bottom of the note, with the note's name above it
+      let nameY = y1 - 4;
+      if (fingers && n.finger && tr.role !== 'bg' && tr.role !== 'muted') {
+        const rad = Math.min(8, bw / 2 - 1);
+        if (rad >= 5) {
+          const cy = y1 - 4 - rad;
+          ctx.globalAlpha = 1;
+          ctx.fillStyle = st === 2 ? '#8a93a4' : 'rgba(255,255,255,0.95)';
+          ctx.beginPath(); ctx.arc(x + bw / 2, cy, rad, 0, Math.PI * 2); ctx.fill();
+          ctx.font = `700 ${Math.round(rad * 1.45)}px Inter, system-ui, sans-serif`;
+          ctx.textBaseline = 'middle';
+          ctx.fillStyle = st === 2 ? MISSED : c0;
+          ctx.fillText(String(n.finger), x + bw / 2, cy + 0.5);
+          ctx.textBaseline = 'bottom';
+          nameY = cy - rad - 3;
+        }
+      }
       // Every note carries its name
       if (showLabels && tr.role !== 'bg' && tr.role !== 'muted') {
         const txt = label(n.k);
@@ -833,7 +990,7 @@ function draw(now, dt) {
           ctx.fillStyle = st === 2 ? '#8a93a4' : 'rgba(255,255,255,0.96)';
           ctx.shadowColor = 'rgba(0,0,0,0.35)';
           ctx.shadowBlur = 2;
-          ctx.fillText(txt, x + bw / 2, y1 - 4);
+          ctx.fillText(txt, x + bw / 2, nameY);
           ctx.shadowBlur = 0;
         }
       }
@@ -1132,6 +1289,7 @@ function renderTracks() {
     sel.value = t.hand;
     sel.onchange = () => {
       t.hand = sel.value;
+      fingerSong(S.song);
       if (S.hands !== 'both' && !S.song.tracks.some((x) => x.hand === S.hands)) S.hands = 'both';
       fitRange();
       applyRoles();
@@ -1236,6 +1394,8 @@ $('#closeSettings').onclick = () => { $('#settings').hidden = true; };
 
 $('#labelsSel').value = prefs.labels;
 $('#labelsSel').onchange = (e) => { prefs.labels = e.target.value; savePrefs(); };
+$('#fingersSel').value = prefs.fingers ? 'on' : 'off';
+$('#fingersSel').onchange = (e) => { prefs.fingers = e.target.value === 'on'; savePrefs(); };
 $('#windowSel').value = String(prefs.window);
 $('#windowSel').onchange = (e) => { prefs.window = parseFloat(e.target.value); savePrefs(); };
 $('#rangeSel').value = prefs.range;
@@ -1257,6 +1417,54 @@ window.addEventListener('drop', (e) => {
   $('#drop').classList.remove('show');
   if (e.dataTransfer.files.length) { audio.unlock(); addFiles(e.dataTransfer.files); }
 });
+
+/* ================= first-time tour ================= */
+
+const TOUR = [
+  { title: 'Connect your keyboard', connect: true,
+    text: 'Plug in a USB or Bluetooth MIDI keyboard and press Connect. No keyboard? Your computer keys play the piano too: the bottom row <kbd>Z</kbd> <kbd>X</kbd> <kbd>C</kbd>… and the top row <kbd>Q</kbd> <kbd>W</kbd> <kbd>E</kbd>… are the white keys.' },
+  { title: 'Pick a song',
+    text: 'Browse the songs and press <b>▶</b> to hear a preview. Start with one marked <b>Easy</b>, then press <b>Learn</b>. You can also drop in any MIDI file.' },
+  { title: 'Practice waits for you',
+    text: 'In <b>Practice</b> the song pauses until you play the lit keys. Learn the <b>right hand</b>, then the <b>left</b>, then <b>both</b>. Your progress is saved: press <kbd>Enter</kbd> to review what you know, <kbd>Shift</kbd>+<kbd>Enter</kbd> to carry on.' },
+];
+let tourAt = 0;
+
+function showTour(i = 0) {
+  tourAt = i;
+  const s = TOUR[i];
+  $('#tourStepLabel').textContent = `Step ${i + 1} of ${TOUR.length}`;
+  $('#tourTitle').textContent = s.title;
+  $('#tourText').innerHTML = s.text;
+  const extra = $('#tourExtra');
+  extra.innerHTML = '';
+  if (s.connect) {
+    const row = el('div', 'tour-connect');
+    const b = el('button', 'btn sm', 'Connect keyboard');
+    const status = el('span', '', midiConnected ? `Connected: ${midiState().inputs[0].name}` : '');
+    b.onclick = async () => {
+      await connectMidi();
+      status.textContent = midiConnected ? `Connected: ${midiState().inputs[0].name}` : 'No keyboard found yet. Check the cable, or use your computer keys.';
+    };
+    row.append(b, status);
+    extra.append(row);
+  }
+  $('#tourDots').innerHTML = TOUR.map((_, k) => `<i class="${k === i ? 'on' : ''}"></i>`).join('');
+  $('#tourBack').hidden = i === 0;
+  $('#tourNext').textContent = i === TOUR.length - 1 ? 'Start playing' : 'Next';
+  $('#tour').hidden = false;
+  $('#tourNext').focus();
+}
+function closeTour() {
+  $('#tour').hidden = true;
+  try { localStorage.setItem('keys.toured', '1'); } catch { /* private mode */ }
+}
+$('#tourNext').onclick = () => (tourAt < TOUR.length - 1 ? showTour(tourAt + 1) : closeTour());
+$('#tourBack').onclick = () => showTour(Math.max(0, tourAt - 1));
+$('#tourClose').onclick = closeTour;
+$('#tour').addEventListener('keydown', (e) => { if (e.code === 'Escape') { e.stopPropagation(); closeTour(); } });
+// Shown once on first start; automated runs (screenshots, tests) load with ?edition= and skip it
+const toured = (() => { try { return localStorage.getItem('keys.toured'); } catch { return '1'; } })();
 
 /* ================= main loop ================= */
 
@@ -1291,8 +1499,12 @@ $('#toneSel').onchange = (e) => { audio.unlock(); setTone(e.target.value); };
 $('#outputSel').onchange = (e) => { const v = e.target.value; if (v === '__connect') { connectMidi(); renderOutputSel(); } else setOutput(v); };
 renderOutputSel();
 
-initLibrary({ onOpen: openEntry, onPreview: togglePreview, previewId, previewProgress, connectMidi, midiState, setOutput, setKeyboardSize, keyboardSize: () => prefs.range, tones: () => ({ list: audio.TONES, current: prefs[toneKey()] }), setTone })
-  .then(() => { initMonetize({ personalEdition: hasCollection() }); onHash(); });
+initLibrary({ onOpen: openEntry, onPreview: togglePreview, previewId, previewProgress, connectMidi, midiState, setOutput, setKeyboardSize, keyboardSize: () => prefs.range, showTour: () => showTour(0), tones: () => ({ list: audio.TONES, current: prefs[toneKey()] }), setTone })
+  .then(() => {
+    initMonetize({ personalEdition: hasCollection() });
+    onHash();
+    if (!toured && !/[?&]edition=/.test(location.search) && !navigator.webdriver) showTour();
+  });
 requestAnimationFrame(frame);
 
 // Handy for debugging in the console

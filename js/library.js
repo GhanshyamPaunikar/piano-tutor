@@ -36,7 +36,7 @@ const saveUi = () => {
   try { localStorage.setItem(UI_KEY, JSON.stringify({ sort: ui.sort, desc: ui.desc, layout: ui.layout, shelfCollapsed: ui.shelfCollapsed })); } catch { /* private mode */ }
 };
 
-let hooks = { onOpen() {}, onPreview() {}, previewId: () => null, previewProgress: () => null, connectMidi() {}, midiState: () => ({}), setOutput() {}, setKeyboardSize() {}, keyboardSize: () => 'fit', tones: () => ({ list: [], current: '' }), setTone() {} };
+let hooks = { onOpen() {}, onPreview() {}, previewId: () => null, previewProgress: () => null, connectMidi() {}, midiState: () => ({}), setOutput() {}, setKeyboardSize() {}, keyboardSize: () => 'fit', tones: () => ({ list: [], current: '' }), setTone() {}, showTour() {} };
 let metaToken = 0;
 
 /* ================= data ================= */
@@ -228,7 +228,8 @@ async function loadUploads() {
   invalidate();
 }
 
-export async function addFiles(files) {
+// opts are passed on to the player when a single file is added (e.g. { mode: 'watch' })
+export async function addFiles(files, opts) {
   const list = [...files].filter((f) => MIDI_RE.test(f.name) || /midi/.test(f.type));
   if (!list.length) { toast('Those are not MIDI files'); return; }
   for (const f of list) await db.set('upload:' + f.name, { blob: f, at: Date.now() });
@@ -237,7 +238,7 @@ export async function addFiles(files) {
   fillMeta();
   if (list.length === 1) {
     const e = L.uploads.find((u) => u.id === 'u:' + list[0].name);
-    if (e) hooks.onOpen(e);
+    if (e) await hooks.onOpen(e, opts);
   } else toast(`Added ${list.length} songs`);
 }
 
@@ -1083,6 +1084,10 @@ export function renderDevices() {
 
   const help = el('section', 'dev-help');
   help.append(el('h3', '', 'No keyboard?'), el('p', '', 'Play with your computer keyboard: the bottom row Z X C V B N M , . / and the top row Q W E R T Y U I O P [ ] are the white keys, and the rows just above them are the black keys. Up and Down arrows change the octave. You can also click the keys on screen, or try Free Play.'));
+  const tourBtn = el('button', 'btn sm', 'Show the welcome tour again');
+  tourBtn.style.marginTop = '12px';
+  tourBtn.onclick = () => hooks.showTour();
+  help.append(tourBtn);
   box.append(card, size, out, tone, help);
   renderSide();
 }
