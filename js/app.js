@@ -13,7 +13,7 @@ const BAD = '#ff5d6c', FREE = '#9aa8bb', MISSED = '#2a303b';
 const SPEEDS = [0.5, 0.6, 0.7, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5];
 
 const prefs = Object.assign(
-  { labels: 'letters', sheet: false, metronome: false, songVol: 0.8, myVol: 0.9, range: 'fit', window: 3, otherHand: true, output: '' },
+  { labels: 'letters', sheet: false, metronome: false, songVol: 0.8, myVol: 0.9, range: 'fit', window: 3, otherHand: true, output: '', tone: 'piano', keyTone: 'keyboard' },
   (() => { try { return JSON.parse(localStorage.getItem('keys.prefs')) || {}; } catch { return {}; } })(),
 );
 const savePrefs = () => { try { localStorage.setItem('keys.prefs', JSON.stringify(prefs)); } catch { /* private mode */ } };
@@ -473,7 +473,25 @@ function applyOutput() {
   renderOutputSel();
   renderDevices();
 }
+// Tone is remembered separately for this computer and for the keyboard
+const toneKey = () => (audio.midiOutput() ? 'keyTone' : 'tone');
+function setTone(id) {
+  prefs[toneKey()] = id;
+  savePrefs();
+  audio.setTones(prefs.tone, prefs.keyTone);
+  renderToneSel();
+  renderDevices();
+}
+function renderToneSel() {
+  const sel = $('#toneSel');
+  const midi = !!audio.midiOutput();
+  sel.innerHTML = '';
+  for (const t of audio.TONES) if (midi || !t.midiOnly) sel.append(new Option(t.label, t.id));
+  sel.value = prefs[toneKey()];
+  $('#toneNote').hidden = !(midi && prefs.keyTone === 'keyboard');
+}
 function renderOutputSel() {
+  renderToneSel();
   const sel = $('#outputSel');
   const m = midiState();
   sel.innerHTML = '';
@@ -1263,15 +1281,17 @@ function frame(now) {
 
 /* ================= start ================= */
 
+audio.setTones(prefs.tone, prefs.keyTone);
 audio.init();
 applyVolumes();
 $('#sheet').hidden = !prefs.sheet;
 if (!window.Midi) toast("Couldn't load the MIDI reader. Check your internet connection.");
 updateHint();
+$('#toneSel').onchange = (e) => { audio.unlock(); setTone(e.target.value); };
 $('#outputSel').onchange = (e) => { const v = e.target.value; if (v === '__connect') { connectMidi(); renderOutputSel(); } else setOutput(v); };
 renderOutputSel();
 
-initLibrary({ onOpen: openEntry, onPreview: togglePreview, previewId, previewProgress, connectMidi, midiState, setOutput, setKeyboardSize, keyboardSize: () => prefs.range })
+initLibrary({ onOpen: openEntry, onPreview: togglePreview, previewId, previewProgress, connectMidi, midiState, setOutput, setKeyboardSize, keyboardSize: () => prefs.range, tones: () => ({ list: audio.TONES, current: prefs[toneKey()] }), setTone })
   .then(() => { initMonetize({ personalEdition: hasCollection() }); onHash(); });
 requestAnimationFrame(frame);
 
