@@ -1,6 +1,6 @@
 // Piano Tutor: the player. Falling notes, keyboard input, practice modes and scoring.
 import { $, $$, el, fmt, isBlack, lowerBound, noteName, NOTE_NAMES, SOLFEGE, toast } from './util.js';
-import { parseMidi, midiClass, HAND_COLORS, HAND_GRADIENTS, HAND_NAMES } from './song.js';
+import { parseMidi, HAND_COLORS, HAND_GRADIENTS, HAND_NAMES } from './song.js';
 import * as audio from './audio.js';
 import { initMonetize } from './monetize.js';
 import { createSheet } from './sheet.js';
@@ -59,7 +59,6 @@ async function openEntry(entry, opts = {}) {
     S.entry = entry;
     $('#player').classList.remove('free');
     setSong(song, opts);
-    syncRec();
     recordPlay(entry.id);
     showPlayer(true);
     if (opts.action === 'review') startReview();
@@ -423,7 +422,6 @@ function noteOn(m, vel = 0.75, fromKeyboard = false) {
   sounding.set(m, audio.myNoteOn(m, vel, fromKeyboard));
   sustained.delete(m);
   lastNote = noteName(m);
-  recNoteOn(m, vel);
   if (S.free) {
     const color = `hsl(${(m % 12) * 30} 72% 62%)`;
     S.trails.push({ m, t0: performance.now(), t1: 0, color });
@@ -433,7 +431,6 @@ function noteOn(m, vel = 0.75, fromKeyboard = false) {
 }
 
 function noteOff(m) {
-  recNoteOff(m);
   S.pressed.delete(m);
   for (const tr of S.trails) if (tr.m === m && !tr.t1) tr.t1 = performance.now();
   if (sustain) { sustained.add(m); return; }
@@ -442,85 +439,12 @@ function noteOff(m) {
 }
 
 function setSustain(down) {
-  if (down !== sustain && rec) rec.cc.push({ time: recNow(), value: down ? 1 : 0 });
   sustain = down;
   if (!down) {
     for (const m of sustained) if (!S.pressed.has(m)) { audio.myNoteOff(sounding.get(m), m); sounding.delete(m); }
     sustained.clear();
   }
 }
-
-/* ================= recording what you play ================= */
-
-const REC_PREFIX = 'My recording ';
-let rec = null; // { t0, open: Map midi -> { time, vel }, notes: [], cc: [] }
-const recNow = () => (performance.now() - rec.t0) / 1000;
-
-function recNoteOn(m, vel) {
-  if (!rec) return;
-  recNoteOff(m);
-  rec.open.set(m, { time: recNow(), vel });
-}
-function recNoteOff(m) {
-  const o = rec && rec.open.get(m);
-  if (!o) return;
-  rec.open.delete(m);
-  rec.notes.push({ midi: m, time: o.time, duration: Math.max(0.05, recNow() - o.time), velocity: o.vel });
-}
-
-function startRecording() {
-  audio.unlock();
-  rec = { t0: performance.now(), open: new Map(), notes: [], cc: [] };
-  if (sustain) rec.cc.push({ time: 0, value: 1 });
-  syncRec();
-  toast('Recording. Play something, then press Stop.');
-}
-
-async function stopRecording() {
-  for (const m of [...rec.open.keys()]) recNoteOff(m);
-  const { notes, cc } = rec;
-  rec = null;
-  syncRec();
-  if (!notes.length) { toast('Nothing was played, so nothing was saved'); return; }
-  // Start half a second before the first note
-  const shift = Math.max(0, Math.min(...notes.map((n) => n.time)) - 0.5);
-  const Midi = midiClass();
-  const midi = new Midi();
-  midi.header.setTempo(120);
-  const tr = midi.addTrack();
-  tr.name = 'Piano';
-  for (const n of notes) tr.addNote({ ...n, time: n.time - shift });
-  for (const c of cc) tr.addCC({ number: 64, value: c.value, time: Math.max(0, c.time - shift) });
-  const d = new Date(), p2 = (x) => String(x).padStart(2, '0');
-  const name = `${REC_PREFIX}${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())} ${p2(d.getHours())}.${p2(d.getMinutes())}.${p2(d.getSeconds())}.mid`;
-  const file = new File([midi.toArray()], name, { type: 'audio/midi' });
-  // Lands in your songs and opens in Listen mode, so you watch and hear yourself back
-  await addFiles([file], { mode: 'watch', hands: 'both' });
-  if (S.entry && S.entry.id === 'u:' + name) { seek(-LEAD_IN); play(); }
-  toast('Saved to your songs. Playing it back…');
-}
-
-function syncRec() {
-  $$('.rec-btn').forEach((b) => {
-    b.classList.toggle('recording', !!rec);
-    b.lastChild.textContent = rec ? 'Stop' : 'Record';
-    b.title = rec ? 'Stop recording and play it back' : 'Record what you play';
-  });
-  $('#saveRecBtn').hidden = !(S.entry && S.entry.id.startsWith('u:' + REC_PREFIX));
-}
-$$('.rec-btn').forEach((b) => { b.onclick = () => (rec ? stopRecording() : startRecording()); });
-
-$('#saveRecBtn').onclick = async () => {
-  if (!S.entry) return;
-  const blob = await S.entry.file();
-  const a = el('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = S.entry.id.slice(2);
-  document.body.append(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
-};
 
 let midiAccess = null, midiConnected = false, lastNote = '';
 function midiState() {

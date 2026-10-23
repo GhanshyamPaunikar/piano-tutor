@@ -228,8 +228,7 @@ async function loadUploads() {
   invalidate();
 }
 
-// opts are passed on to the player when a single file is added (e.g. { mode: 'watch' })
-export async function addFiles(files, opts) {
+export async function addFiles(files) {
   const list = [...files].filter((f) => MIDI_RE.test(f.name) || /midi/.test(f.type));
   if (!list.length) { toast('Those are not MIDI files'); return; }
   for (const f of list) await db.set('upload:' + f.name, { blob: f, at: Date.now() });
@@ -238,7 +237,7 @@ export async function addFiles(files, opts) {
   fillMeta();
   if (list.length === 1) {
     const e = L.uploads.find((u) => u.id === 'u:' + list[0].name);
-    if (e) await hooks.onOpen(e, opts);
+    if (e) hooks.onOpen(e);
   } else toast(`Added ${list.length} songs`);
 }
 
