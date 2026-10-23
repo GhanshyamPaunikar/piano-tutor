@@ -35,7 +35,6 @@ const S = {
   chord: null, waiting: false,
   pressed: new Map(),   // midi -> key colour while held
   sparks: [],
-  transpose: 0,         // semitones the song is moved up or down
   free: false,          // Free Play: no song, just the piano
   trails: [],           // Free Play: notes rising from the keys
 };
@@ -87,9 +86,6 @@ function setSong(song, opts = {}) {
     S.hands = p.practiceHands || S.hands;
     S.speed = p.speed || 1;
   }
-  for (const n of song.notes) n.midi0 = n.midi;
-  song.key0 = song.key;
-  applyTranspose(song, (p && p.transpose) || 0);
   if (opts.mode) S.mode = opts.mode;
   if (opts.hands) S.hands = opts.hands;
   if (S.hands !== 'both' && !song.tracks.some((t) => t.hand === S.hands)) {
@@ -112,68 +108,12 @@ function setSong(song, opts = {}) {
   updateLoopUI();
   renderTracks();
   renderLearned();
-  renderKey();
 }
 
 function saveSongSettings() {
   if (!S.song) return;
-  setSongPrefs(S.song.id, { hands: S.song.tracks.map((t) => t.hand), mode: S.mode, practiceHands: S.hands, speed: S.speed, learned: S.learnedMap, transpose: S.transpose });
+  setSongPrefs(S.song.id, { hands: S.song.tracks.map((t) => t.hand), mode: S.mode, practiceHands: S.hands, speed: S.speed, learned: S.learnedMap });
 }
-
-/* ================= key: move the whole song up or down ================= */
-
-const SEMI = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
-const MAJOR_KEYS = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
-const MINOR_KEYS = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'G#', 'A', 'Bb', 'B'];
-function shiftKey(key, d) {
-  if (!key || !(key.key[0] in SEMI)) return key;
-  const root = SEMI[key.key[0]] + (key.key[1] === '#' ? 1 : key.key[1] === 'b' ? -1 : 0);
-  const i = (((root + d) % 12) + 12) % 12;
-  return { key: (key.scale === 'minor' ? MINOR_KEYS : MAJOR_KEYS)[i], scale: key.scale };
-}
-const keyName = (key) => (key ? `${key.key} ${key.scale === 'minor' ? 'minor' : 'major'}` : '');
-
-function applyTranspose(song, d) {
-  S.transpose = Math.max(-12, Math.min(12, d));
-  for (const n of song.notes) n.midi = Math.max(21, Math.min(108, n.midi0 + S.transpose));
-  song.key = shiftKey(song.key0, S.transpose);
-}
-
-function setTranspose(d) {
-  if (!S.song) return;
-  applyTranspose(S.song, d);
-  fitRange();
-  applyRoles();
-  seek(S.t);
-  if (prefs.sheet) sheet.render(S.song);
-  renderKey();
-  saveSongSettings();
-}
-
-// The shift (within half an octave) that puts the fewest of your notes on black keys
-function easiestKey() {
-  const mine = S.song.notes.filter((n) => S.song.tracks[n.track].hand === 'R' || S.song.tracks[n.track].hand === 'L');
-  let best = 0, bestCount = Infinity;
-  for (const d of [0, -1, 1, -2, 2, -3, 3, -4, 4, -5, 5, 6]) {
-    const c = mine.reduce((s, n) => s + (isBlack(n.midi0 + d) ? 1 : 0), 0);
-    if (c < bestCount) { best = d; bestCount = c; }
-  }
-  setTranspose(best);
-  toast(best ? `Moved ${Math.abs(best)} semitone${Math.abs(best) > 1 ? 's' : ''} ${best > 0 ? 'up' : 'down'}: ${bestCount} black-key notes left` : 'This song is already in its easiest key');
-}
-
-function renderKey() {
-  if (!S.song) return;
-  const d = S.transpose;
-  $('#keyVal').textContent = d > 0 ? `+${d}` : String(d);
-  const from = keyName(S.song.key0), to = keyName(S.song.key);
-  $('#keyInfo').textContent = !d ? (from ? `Original key: ${from}` : 'Original key')
-    : from ? `${to} (from ${from})` : `${Math.abs(d)} semitone${Math.abs(d) > 1 ? 's' : ''} ${d > 0 ? 'up' : 'down'}`;
-}
-$('#keyDown').onclick = () => setTranspose(S.transpose - 1);
-$('#keyUp').onclick = () => setTranspose(S.transpose + 1);
-$('#keyReset').onclick = () => setTranspose(0);
-$('#keyEasy').onclick = () => S.song && easiestKey();
 
 // Keyboard sizes people own, with their usual lowest and highest keys
 const KEYBOARDS = { 25: [48, 72], 37: [48, 84], 49: [36, 84], 61: [36, 96], 76: [28, 103], 88: [21, 108] };
