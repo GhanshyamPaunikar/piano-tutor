@@ -4,7 +4,6 @@ import { parseMidi, midiClass, HAND_COLORS, HAND_GRADIENTS, HAND_NAMES } from '.
 import * as audio from './audio.js';
 import { initMonetize } from './monetize.js';
 import { createSheet } from './sheet.js';
-import { fingerSong } from './fingering.js';
 import { initLibrary, addFiles, recordPlay, getSongPrefs, setSongPrefs, nextEntry, entryById, hasCollection, libraryHash, renderDevices, refreshPreview, render as renderLibrary } from './library.js';
 
 const LEAD_IN = 2;   // seconds of empty roll before the first note
@@ -14,7 +13,7 @@ const BAD = '#ff5d6c', FREE = '#9aa8bb', MISSED = '#2a303b';
 const SPEEDS = [0.5, 0.6, 0.7, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5];
 
 const prefs = Object.assign(
-  { labels: 'letters', sheet: false, metronome: false, songVol: 0.8, myVol: 0.9, range: 'fit', window: 3, otherHand: true, output: '', tone: 'piano', keyTone: 'keyboard', fingers: true },
+  { labels: 'letters', sheet: false, metronome: false, songVol: 0.8, myVol: 0.9, range: 'fit', window: 3, otherHand: true, output: '', tone: 'piano', keyTone: 'keyboard' },
   (() => { try { return JSON.parse(localStorage.getItem('keys.prefs')) || {}; } catch { return {}; } })(),
 );
 const savePrefs = () => { try { localStorage.setItem('keys.prefs', JSON.stringify(prefs)); } catch { /* private mode */ } };
@@ -99,7 +98,6 @@ function setSong(song, opts = {}) {
   }
 
   pause();
-  fingerSong(song);
   fitRange();
   applyRoles();
   seek(-LEAD_IN);
@@ -144,7 +142,6 @@ function applyTranspose(song, d) {
 function setTranspose(d) {
   if (!S.song) return;
   applyTranspose(S.song, d);
-  fingerSong(S.song);
   fitRange();
   applyRoles();
   seek(S.t);
@@ -921,8 +918,7 @@ function draw(now, dt) {
 
     const chord = S.mode === 'practice' ? S.chord : null;
     const nextSet = chord ? new Set(chord.idx.filter((i) => chord.need.has(S.learn[i].k)).map((i) => S.learn[i])) : null;
-    const fingers = prefs.fingers;
-    const minH = (showLabels ? 20 : 6) + (fingers ? 18 : 0);
+    const minH = showLabels ? 20 : 6;
 
     for (let i = lowerBound(song.notes, t - 10); i < song.notes.length; i++) {
       const n = song.notes[i];
@@ -964,23 +960,6 @@ function draw(now, dt) {
         rrect(x, top, bw, hgt, r); ctx.stroke();
       }
 
-      // Suggested finger in a small badge at the bottom of the note, with the note's name above it
-      let nameY = y1 - 4;
-      if (fingers && n.finger && tr.role !== 'bg' && tr.role !== 'muted') {
-        const rad = Math.min(8, bw / 2 - 1);
-        if (rad >= 5) {
-          const cy = y1 - 4 - rad;
-          ctx.globalAlpha = 1;
-          ctx.fillStyle = st === 2 ? '#8a93a4' : 'rgba(255,255,255,0.95)';
-          ctx.beginPath(); ctx.arc(x + bw / 2, cy, rad, 0, Math.PI * 2); ctx.fill();
-          ctx.font = `700 ${Math.round(rad * 1.45)}px Inter, system-ui, sans-serif`;
-          ctx.textBaseline = 'middle';
-          ctx.fillStyle = st === 2 ? MISSED : c0;
-          ctx.fillText(String(n.finger), x + bw / 2, cy + 0.5);
-          ctx.textBaseline = 'bottom';
-          nameY = cy - rad - 3;
-        }
-      }
       // Every note carries its name
       if (showLabels && tr.role !== 'bg' && tr.role !== 'muted') {
         const txt = label(n.k);
@@ -990,7 +969,7 @@ function draw(now, dt) {
           ctx.fillStyle = st === 2 ? '#8a93a4' : 'rgba(255,255,255,0.96)';
           ctx.shadowColor = 'rgba(0,0,0,0.35)';
           ctx.shadowBlur = 2;
-          ctx.fillText(txt, x + bw / 2, nameY);
+          ctx.fillText(txt, x + bw / 2, y1 - 4);
           ctx.shadowBlur = 0;
         }
       }
@@ -1289,7 +1268,6 @@ function renderTracks() {
     sel.value = t.hand;
     sel.onchange = () => {
       t.hand = sel.value;
-      fingerSong(S.song);
       if (S.hands !== 'both' && !S.song.tracks.some((x) => x.hand === S.hands)) S.hands = 'both';
       fitRange();
       applyRoles();
@@ -1394,8 +1372,6 @@ $('#closeSettings').onclick = () => { $('#settings').hidden = true; };
 
 $('#labelsSel').value = prefs.labels;
 $('#labelsSel').onchange = (e) => { prefs.labels = e.target.value; savePrefs(); };
-$('#fingersSel').value = prefs.fingers ? 'on' : 'off';
-$('#fingersSel').onchange = (e) => { prefs.fingers = e.target.value === 'on'; savePrefs(); };
 $('#windowSel').value = String(prefs.window);
 $('#windowSel').onchange = (e) => { prefs.window = parseFloat(e.target.value); savePrefs(); };
 $('#rangeSel').value = prefs.range;
@@ -1417,54 +1393,6 @@ window.addEventListener('drop', (e) => {
   $('#drop').classList.remove('show');
   if (e.dataTransfer.files.length) { audio.unlock(); addFiles(e.dataTransfer.files); }
 });
-
-/* ================= first-time tour ================= */
-
-const TOUR = [
-  { title: 'Connect your keyboard', connect: true,
-    text: 'Plug in a USB or Bluetooth MIDI keyboard and press Connect. No keyboard? Your computer keys play the piano too: the bottom row <kbd>Z</kbd> <kbd>X</kbd> <kbd>C</kbd>… and the top row <kbd>Q</kbd> <kbd>W</kbd> <kbd>E</kbd>… are the white keys.' },
-  { title: 'Pick a song',
-    text: 'Browse the songs and press <b>▶</b> to hear a preview. Start with one marked <b>Easy</b>, then press <b>Learn</b>. You can also drop in any MIDI file.' },
-  { title: 'Practice waits for you',
-    text: 'In <b>Practice</b> the song pauses until you play the lit keys. Learn the <b>right hand</b>, then the <b>left</b>, then <b>both</b>. Your progress is saved: press <kbd>Enter</kbd> to review what you know, <kbd>Shift</kbd>+<kbd>Enter</kbd> to carry on.' },
-];
-let tourAt = 0;
-
-function showTour(i = 0) {
-  tourAt = i;
-  const s = TOUR[i];
-  $('#tourStepLabel').textContent = `Step ${i + 1} of ${TOUR.length}`;
-  $('#tourTitle').textContent = s.title;
-  $('#tourText').innerHTML = s.text;
-  const extra = $('#tourExtra');
-  extra.innerHTML = '';
-  if (s.connect) {
-    const row = el('div', 'tour-connect');
-    const b = el('button', 'btn sm', 'Connect keyboard');
-    const status = el('span', '', midiConnected ? `Connected: ${midiState().inputs[0].name}` : '');
-    b.onclick = async () => {
-      await connectMidi();
-      status.textContent = midiConnected ? `Connected: ${midiState().inputs[0].name}` : 'No keyboard found yet. Check the cable, or use your computer keys.';
-    };
-    row.append(b, status);
-    extra.append(row);
-  }
-  $('#tourDots').innerHTML = TOUR.map((_, k) => `<i class="${k === i ? 'on' : ''}"></i>`).join('');
-  $('#tourBack').hidden = i === 0;
-  $('#tourNext').textContent = i === TOUR.length - 1 ? 'Start playing' : 'Next';
-  $('#tour').hidden = false;
-  $('#tourNext').focus();
-}
-function closeTour() {
-  $('#tour').hidden = true;
-  try { localStorage.setItem('keys.toured', '1'); } catch { /* private mode */ }
-}
-$('#tourNext').onclick = () => (tourAt < TOUR.length - 1 ? showTour(tourAt + 1) : closeTour());
-$('#tourBack').onclick = () => showTour(Math.max(0, tourAt - 1));
-$('#tourClose').onclick = closeTour;
-$('#tour').addEventListener('keydown', (e) => { if (e.code === 'Escape') { e.stopPropagation(); closeTour(); } });
-// Shown once on first start; automated runs (screenshots, tests) load with ?edition= and skip it
-const toured = (() => { try { return localStorage.getItem('keys.toured'); } catch { return '1'; } })();
 
 /* ================= main loop ================= */
 
@@ -1499,12 +1427,8 @@ $('#toneSel').onchange = (e) => { audio.unlock(); setTone(e.target.value); };
 $('#outputSel').onchange = (e) => { const v = e.target.value; if (v === '__connect') { connectMidi(); renderOutputSel(); } else setOutput(v); };
 renderOutputSel();
 
-initLibrary({ onOpen: openEntry, onPreview: togglePreview, previewId, previewProgress, connectMidi, midiState, setOutput, setKeyboardSize, keyboardSize: () => prefs.range, showTour: () => showTour(0), tones: () => ({ list: audio.TONES, current: prefs[toneKey()] }), setTone })
-  .then(() => {
-    initMonetize({ personalEdition: hasCollection() });
-    onHash();
-    if (!toured && !/[?&]edition=/.test(location.search) && !navigator.webdriver) showTour();
-  });
+initLibrary({ onOpen: openEntry, onPreview: togglePreview, previewId, previewProgress, connectMidi, midiState, setOutput, setKeyboardSize, keyboardSize: () => prefs.range, tones: () => ({ list: audio.TONES, current: prefs[toneKey()] }), setTone })
+  .then(() => { initMonetize({ personalEdition: hasCollection() }); onHash(); });
 requestAnimationFrame(frame);
 
 // Handy for debugging in the console
