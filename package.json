@@ -1,7 +1,7 @@
 {
   "name": "piano-tutor",
   "productName": "Piano Tutor",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "The easiest way to learn piano: falling notes, every key named, one hand at a time, works with any MIDI keyboard.",
   "author": "Ghanshyam Paunikar",
   "private": true,
