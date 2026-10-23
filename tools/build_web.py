@@ -8,7 +8,9 @@ resolve against their own files and are left alone. With songs/ included the app
 no ads and no purchase.
 """
 import argparse
+import json
 import shutil
+import unicodedata
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -57,6 +59,14 @@ def main():
         ('fetch(`${dir}/index.json`)', f'fetch(`{base}${{dir}}/index.json`)', 1),
         ('fetch(`${dir}/` + s.file', f'fetch(`{base}${{dir}}/` + s.file', 1),
     ])
+
+    # macOS names files in decomposed Unicode (NFD) but git stores them composed (NFC), and web hosts match
+    # names byte for byte: list every song in NFC so names like "Für Elise" resolve once deployed
+    index = out / 'songs' / 'index.json'
+    data = json.loads(index.read_text(encoding='utf-8'))
+    for s in data['songs']:
+        s['file'] = unicodedata.normalize('NFC', s['file'])
+    index.write_text(json.dumps(data, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
 
     files = sum(1 for p in out.rglob('*') if p.is_file())
     size = sum(p.stat().st_size for p in out.rglob('*') if p.is_file())
