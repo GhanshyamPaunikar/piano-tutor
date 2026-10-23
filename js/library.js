@@ -36,7 +36,7 @@ const saveUi = () => {
   try { localStorage.setItem(UI_KEY, JSON.stringify({ sort: ui.sort, desc: ui.desc, layout: ui.layout, shelfCollapsed: ui.shelfCollapsed })); } catch { /* private mode */ }
 };
 
-let hooks = { onOpen() {}, onPreview() {}, previewId: () => null, previewProgress: () => null, connectMidi() {}, midiState: () => ({}), setOutput() {}, setKeyboardSize() {}, keyboardSize: () => 'fit' };
+let hooks = { onOpen() {}, onPreview() {}, previewId: () => null, previewProgress: () => null, connectMidi() {}, midiState: () => ({}), setOutput() {}, setKeyboardSize() {}, keyboardSize: () => 'fit', tones: () => ({ list: [], current: '' }), setTone() {} };
 let metaToken = 0;
 
 /* ================= data ================= */
@@ -1046,6 +1046,25 @@ export function renderDevices() {
     out.append(r);
   }
 
+  // Which instrument the sound uses
+  const tone = el('section', 'dev-card dev-out');
+  const th = el('div', 'dev-top');
+  const tt = el('div', 'dev-text');
+  tt.append(el('div', 'dev-title', 'Tone'), el('div', 'dev-sub', m.output
+    ? `How ${m.output} sounds. "Keyboard's own tone" follows whatever you pick on its panel, for the song and your keys alike.`
+    : 'How the song and your keys sound on this computer.'));
+  th.append(tt);
+  const tc = el('div', 'size-chips');
+  const { list, current: curTone } = hooks.tones();
+  for (const t of list) {
+    if (t.midiOnly && !m.output) continue;
+    const b = el('button', 'tab' + (curTone === t.id ? ' on' : ''), t.label);
+    b.setAttribute('aria-pressed', String(curTone === t.id));
+    b.onclick = () => hooks.setTone(t.id);
+    tc.append(b);
+  }
+  tone.append(th, tc);
+
   // Keyboard size, so the screen shows exactly the keys you have
   const size = el('section', 'dev-card dev-out');
   const sh = el('div', 'dev-top');
@@ -1064,7 +1083,7 @@ export function renderDevices() {
 
   const help = el('section', 'dev-help');
   help.append(el('h3', '', 'No keyboard?'), el('p', '', 'Play with your computer keyboard: the bottom row Z X C V B N M , . / and the top row Q W E R T Y U I O P [ ] are the white keys, and the rows just above them are the black keys. Up and Down arrows change the octave. You can also click the keys on screen, or try Free Play.'));
-  box.append(card, size, out, help);
+  box.append(card, size, out, tone, help);
   renderSide();
 }
 
