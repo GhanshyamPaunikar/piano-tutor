@@ -125,6 +125,8 @@ export function init() {
 }
 
 export function unlock() {
+  // iPhone: play through the ring/silent switch, as music apps do
+  if (navigator.audioSession && navigator.audioSession.type !== 'playback') navigator.audioSession.type = 'playback';
   if (window.Tone && Tone.context.state !== 'running') Tone.start();
 }
 
