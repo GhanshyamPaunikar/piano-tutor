@@ -1,5 +1,5 @@
 // Piano Tutor: the player. Falling notes, keyboard input, practice modes and scoring.
-import { $, $$, el, fmt, isBlack, lowerBound, noteName, NOTE_NAMES, SOLFEGE, toast } from './util.js';
+import { $, $$, el, fmt, isBlack, isIOS, lowerBound, NO_MIDI_IOS, noteName, NOTE_NAMES, SOLFEGE, toast } from './util.js';
 import { parseMidi, HAND_COLORS, HAND_GRADIENTS, HAND_NAMES } from './song.js';
 import * as audio from './audio.js';
 import { initMonetize } from './monetize.js';
@@ -502,7 +502,7 @@ function renderOutputSel() {
   sel.value = prefs.output;
 }
 async function connectMidi() {
-  if (!navigator.requestMIDIAccess) { toast('This browser has no Web MIDI. Use Chrome or Edge for a MIDI keyboard.'); return; }
+  if (!navigator.requestMIDIAccess) { toast(isIOS ? 'iPhone and iPad browsers can’t use MIDI keyboards. See MIDI Devices for an app that can.' : 'This browser has no Web MIDI. Use Chrome or Edge for a MIDI keyboard.'); return; }
   try {
     midiAccess = await navigator.requestMIDIAccess();
     midiAccess.onstatechange = hookMidi;

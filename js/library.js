@@ -1,7 +1,7 @@
 // Library screen: the built-in collection (songs/), your own MIDI folder (remembered between visits),
 // files you add one by one, favourites, playlists and play history.
 import * as db from './store.js';
-import { $, $$, el, fmt, toast } from './util.js';
+import { $, $$, el, fmt, isIOS, NO_MIDI_IOS, toast } from './util.js';
 import { quickInfo } from './song.js';
 
 const MIDI_RE = /\.(mid|midi|kar)$/i;
@@ -1005,7 +1005,7 @@ export function renderDevices() {
   const txt = el('div', 'dev-text');
   txt.append(
     el('div', 'dev-title', m.connected ? `${m.inputs.length} keyboard${m.inputs.length > 1 ? 's' : ''} connected` : m.supported ? 'No keyboard connected' : 'This browser can’t use MIDI keyboards'),
-    el('div', 'dev-sub', !m.supported ? 'Use Chrome or Edge to connect a keyboard. The computer keyboard and mouse still work.'
+    el('div', 'dev-sub', !m.supported ? (isIOS ? NO_MIDI_IOS : 'Use Chrome or Edge to connect a keyboard. The computer keyboard and mouse still work.')
       : m.access ? 'Plug in a keyboard over USB or Bluetooth and it shows up here.' : 'Allow access so Piano Tutor can hear your keyboard.'),
   );
   top.append(el('span', 'led' + (m.connected ? ' on' : '')), txt);
