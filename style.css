@@ -705,3 +705,7 @@ input[type=range]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 
 .tile-learned { color: #4fdca0; }
 .tile-bar { display: block; height: 3px; margin-top: 6px; border-radius: 2px; background: var(--line-strong); overflow: hidden; }
 .tile-bar i { display: block; height: 100%; background: #3ccf8e; }
+.loop-edit { display: inline-flex; align-items: center; gap: 4px; }
+.loop-edit[hidden] { display: none; }
+.loop-edit .icon-chip { width: 26px; font-size: 16px; }
+.loop-edit #loopLabel { padding: 0 6px; font-size: 13px; color: var(--text); white-space: nowrap; font-variant-numeric: tabular-nums; }

@@ -283,7 +283,7 @@ function renderLearned() {
 function play() {
   if (!S.song) return;
   audio.unlock();
-  if (S.t >= S.song.duration) seek(S.loopA ?? -LEAD_IN);
+  if (S.t >= S.song.duration) seek(S.loopA != null ? loopFrom() : -LEAD_IN);
   S.playing = true;
   updatePlayBtn();
 }
@@ -314,11 +314,15 @@ function ensureChord() {
 function advance(dt) {
   const song = S.song;
   let next = S.t + dt * S.speed;
+  // Stop exactly at the loop's end, so a note on that bar line isn't waited for or played before jumping back
+  const loopEnd = S.loopB != null && next >= S.loopB;
+  if (loopEnd) next = S.loopB;
 
   S.waiting = false;
   if (S.mode === 'practice') {
     let c;
     while ((c = ensureChord()) && next >= c.t) {
+      if (loopEnd && c.t >= S.loopB - 0.001) break;
       if (c.need.size) { next = c.t; S.waiting = true; break; }
       S.waitIdx = c.end;
       S.chord = null;
@@ -344,7 +348,7 @@ function advance(dt) {
 
   S.t = next;
   extendLearned(S.t);
-  if (S.loopB != null && S.t >= S.loopB) seek(S.loopA);
+  if (S.loopB != null && S.t >= S.loopB) seek(loopFrom());
   else if (S.t >= song.duration) finish();
 }
 
@@ -1146,33 +1150,88 @@ function renderTracks() {
   });
 }
 
+/* ----- loops snap to bars; the ‹ › buttons then move either end by one beat ----- */
+
+// Bar start times are plain numbers, not notes
+const lowerBoundNum = (arr, t) => { let lo = 0, hi = arr.length; while (lo < hi) { const mid = (lo + hi) >> 1; if (arr[mid] < t) lo = mid + 1; else hi = mid; } return lo; };
+// Listen and Play along get half a second's run-up into the loop; Practice waits anyway, so it starts on the
+// loop's first note instead of asking for notes from the bar before
+const LOOP_RUNUP = 0.5;
+const loopFrom = () => Math.max(-LEAD_IN, S.loopA - (S.review || S.mode === 'practice' ? 0 : LOOP_RUNUP));
+const barIndex = (t) => Math.max(0, lowerBoundNum(S.song.measures, t + 0.001) - 1); // bar containing t
+const barStart = (t) => S.song.measures[barIndex(t)];
+const barEnd = (t) => Math.min(S.song.duration, S.song.measures[barIndex(t) + 1] ?? S.song.duration);
+const beatBefore = (t) => { const i = lowerBound(S.song.beats, t - 0.001) - 1; return i >= 0 ? S.song.beats[i].time : null; };
+const beatAfter = (t) => { const b = S.song.beats[lowerBound(S.song.beats, t + 0.001)]; return b ? b.time : null; };
+
+// "5" on a bar line, "5.3" on beat 3 of bar 5
+function barBeat(t) {
+  const i = barIndex(t), m = S.song.measures[i];
+  if (Math.abs(t - m) < 0.01) return String(i + 1);
+  return `${i + 1}.${lowerBound(S.song.beats, t - 0.001) - lowerBound(S.song.beats, m - 0.001) + 1}`;
+}
+// The end shows the last bar (or bar.beat) still inside the loop
+function barBeatEnd(t) {
+  const i = lowerBoundNum(S.song.measures, t - 0.001);
+  if (Math.abs((S.song.measures[i] ?? Infinity) - t) < 0.01 || t >= S.song.duration - 0.01) return String(Math.max(1, i));
+  const last = barBeat(beatBefore(t) ?? t);
+  return last.includes('.') ? last : last + '.1'; // ends after the first beat of a bar
+
+}
+
 function updateLoopUI() {
   const btn = $('#loopBtn'), band = $('#loopBand');
   const dur = S.song ? S.song.duration : 1;
+  $('#loopEdit').hidden = S.loopA == null || S.loopB == null || S.review;
   if (S.loopA == null) { btn.textContent = 'Loop A–B'; btn.classList.remove('active'); band.style.display = 'none'; return; }
   btn.classList.add('active');
   const a = Math.max(0, S.loopA) / dur * 100;
   band.style.display = 'block';
   band.style.left = a + '%';
-  if (S.loopB == null) { btn.textContent = 'Set end (B)'; band.style.width = '0'; }
-  else { btn.textContent = 'Clear loop'; band.style.width = ((S.loopB - Math.max(0, S.loopA)) / dur * 100) + '%'; }
+  if (S.loopB == null) { btn.textContent = 'Set end (B)'; band.style.width = '0'; return; }
+  btn.textContent = 'Clear loop';
+  band.style.width = ((S.loopB - Math.max(0, S.loopA)) / dur * 100) + '%';
+  if (!S.review) $('#loopLabel').textContent = `Bars ${barBeat(S.loopA)}–${barBeatEnd(S.loopB)}`;
 }
 
 $('#loopBtn').onclick = () => {
   if (!S.song) return;
   if (S.review) { stopReview(); return; }
-  if (S.loopA == null) S.loopA = Math.max(0, S.t);
-  else if (S.loopB == null) {
-    if (S.t <= S.loopA + 0.25) { toast('Play or skip past point A first'); return; }
-    S.loopB = S.t;
-    S.loopA = Math.max(-LEAD_IN, S.loopA - 0.5); // short run-up into the loop
-    seek(S.loopA);
+  if (S.loopA == null) {
+    S.loopA = barStart(Math.max(0, S.t));
+    toast(`Loop starts at bar ${barBeat(S.loopA)}. Press again in the last bar you want.`);
+  } else if (S.loopB == null) {
+    const end = barEnd(Math.max(0, S.t));
+    if (end <= S.loopA + 0.01) { toast('Play or skip past the start of the loop first'); return; }
+    S.loopB = end;
+    seek(loopFrom());
   } else { S.loopA = S.loopB = null; seek(S.t); }
   updateLoopUI();
 };
 
+// Move one end of the loop by a beat, keeping at least one beat inside it
+function nudgeLoop(end, dir) {
+  if (S.loopA == null || S.loopB == null || S.review) return;
+  if (end === 'A') {
+    const t = dir < 0 ? beatBefore(S.loopA) : beatAfter(S.loopA);
+    if (t == null || t < 0 || t >= S.loopB - 0.01) return;
+    S.loopA = t;
+    seek(loopFrom());
+  } else {
+    const t = dir < 0 ? beatBefore(S.loopB) : beatAfter(S.loopB) ?? S.song.duration;
+    if (t == null || t <= S.loopA + 0.01) return;
+    S.loopB = Math.min(t, S.song.duration);
+    if (S.t >= S.loopB) seek(loopFrom());
+  }
+  updateLoopUI();
+}
+$('#loopAEarlier').onclick = () => nudgeLoop('A', -1);
+$('#loopALater').onclick = () => nudgeLoop('A', 1);
+$('#loopBEarlier').onclick = () => nudgeLoop('B', -1);
+$('#loopBLater').onclick = () => nudgeLoop('B', 1);
+
 $('#playBtn').onclick = togglePlay;
-$('#restartBtn').onclick = () => seek(S.loopA ?? -LEAD_IN);
+$('#restartBtn').onclick = () => seek(S.loopA != null ? loopFrom() : -LEAD_IN);
 $('#backBtn').onclick = () => showPlayer(false);
 $('#songPick').onclick = () => showPlayer(false);
 $('#reviewBtn').onclick = startReview;
