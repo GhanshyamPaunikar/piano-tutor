@@ -315,7 +315,14 @@
         </button>
       </div>
       <div class="grow"></div>
-      <button class="chip" id="loopBtn">Loop A–B</button>
+      <button class="chip" id="loopBtn" title="Press in the first bar to loop, then again in the last bar">Loop A–B</button>
+      <span class="loop-edit" id="loopEdit" hidden>
+        <button class="chip icon-chip" id="loopAEarlier" title="Start one beat earlier" aria-label="Start one beat earlier">‹</button>
+        <button class="chip icon-chip" id="loopALater" title="Start one beat later" aria-label="Start one beat later">›</button>
+        <span id="loopLabel" title="bar.beat: use the arrows either side to move the start or the end by one beat"></span>
+        <button class="chip icon-chip" id="loopBEarlier" title="End one beat earlier" aria-label="End one beat earlier">‹</button>
+        <button class="chip icon-chip" id="loopBLater" title="End one beat later" aria-label="End one beat later">›</button>
+      </span>
       <button class="chip" id="sheetBtn" title="Sheet music">Sheet music</button>
       <button class="chip" id="metroBtn" title="Metronome">Metronome</button>
     </div>
