@@ -1,11 +1,13 @@
-"""Builds the web version of Piano Tutor, with the full song collection, into a folder served at a sub-path.
+"""Builds the web version of Piano Tutor into a folder served at a sub-path.
 
-    python3 tools/build_web.py ../ghanshyam/public/pianotutor --base /pianotutor/
+    python3 tools/build_web.py ../ghanshyam/public/pianotutor --base /pianotutor/ [--songs starter]
+
+--songs picks the songs it serves: the full collection in songs/ (the default), or the starter songs.
 
 The page is served at <base> without a trailing slash (e.g. ghanshyampaunikar.com/pianotutor), so paths that the
 browser resolves against the page address are made absolute. Paths inside the CSS and between the JS modules
-resolve against their own files and are left alone. With songs/ included the app runs as the personal edition:
-no ads and no purchase.
+resolve against their own files and are left alone. The chosen songs are served as songs/, so the app runs as the
+personal edition: no ads and no purchase.
 """
 import argparse
 import json
@@ -14,7 +16,7 @@ import unicodedata
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-COPY = ['index.html', 'style.css', 'js', 'vendor', 'samples', 'fonts', 'icons', 'starter', 'songs']
+COPY = ['index.html', 'style.css', 'js', 'vendor', 'samples', 'fonts', 'icons', 'starter']
 
 
 def patch(path, pairs):
@@ -31,12 +33,13 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('out', type=Path)
     ap.add_argument('--base', default='/pianotutor/')
+    ap.add_argument('--songs', choices=['songs', 'starter'], default='songs')
     args = ap.parse_args()
     base = '/' + args.base.strip('/') + '/'
     out = args.out.resolve()
 
-    if not (ROOT / 'songs' / 'index.json').exists():
-        raise SystemExit('songs/index.json is missing: the web version needs the song collection')
+    if not (ROOT / args.songs / 'index.json').exists():
+        raise SystemExit(f'{args.songs}/index.json is missing')
     if out.exists():
         shutil.rmtree(out)
     out.mkdir(parents=True)
@@ -46,6 +49,7 @@ def main():
             shutil.copytree(src, out / name, ignore=shutil.ignore_patterns('.DS_Store'))
         else:
             shutil.copy2(src, out / name)
+    shutil.copytree(ROOT / args.songs, out / 'songs', ignore=shutil.ignore_patterns('.DS_Store'))
 
     patch(out / 'index.html', [
         ('href="icons/', f'href="{base}icons/', 3),

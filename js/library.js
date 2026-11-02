@@ -484,7 +484,7 @@ function renderHeader() {
   $('#crumb').textContent = title;
   const total = allEntries().length;
   $('#viewSub').textContent = {
-    library: personalEdition ? songs(total) : `${songs(total)} · add your own MIDI files any time`,
+    library: `${songs(total)} · add your own MIDI files any time`,
     recent: 'Songs you have opened, newest first',
     favorites: 'Songs you marked with a heart',
     playlists: `${L.playlists.length} playlist${L.playlists.length === 1 ? '' : 's'}`,

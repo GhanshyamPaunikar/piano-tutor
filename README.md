@@ -16,6 +16,8 @@
 
 <p align="center">Watch the notes fall, press the keys that light up, and play real songs from day one.<br>Practice waits for you, one hand at a time. Works with any MIDI keyboard, or your computer keys.</p>
 
+<p align="center">Comes with <b>16 songs</b> to start: Until I Found You, Perfect, Someone You Loved, All of Me, River Flows In You,<br>A Thousand Years, Golden Hour, Shallow, Die With A Smile and Believer, plus six classics.<br><b>Add your own MIDI files any time</b> and learn any song you like.</p>
+
 <p align="center"><b><a href="https://ghanshyampaunikar.com/pianotutor">Try it in your browser</a></b> · <a href="https://github.com/GhanshyamPaunikar/piano-tutor/releases/latest">Download for Mac or Windows</a> · <a href="#for-developers">How it is built</a></p>
 
 <br>
@@ -85,6 +87,8 @@ Turn on **Sheet music** and a grand staff, generated from the song, scrolls abov
 | **Tones** | Grand piano, electric piano, organ, strings, synth or music box. |
 | **Sustain pedal** | Your keyboard's sustain pedal just works. |
 | **Previews** | Click any song to hear 30 seconds before you start. |
+| **Songs to start with** | 16 songs ready to play: ten popular songs with their album artwork, and six classics. |
+| **Your own songs** | Add any MIDI file, or a whole folder of them, any time. Tracks are split into left and right hand for you. |
 | **Your music folder** | Point Piano Tutor at a folder of MIDI files once. It remembers it and reads every subfolder. |
 | **Works offline** | The desktop app and its piano sound need no internet connection. |
 
@@ -113,7 +117,7 @@ Download the latest version from the **[Releases page](https://github.com/Ghansh
 
 ### In your browser
 
-Open **[ghanshyampaunikar.com/pianotutor](https://ghanshyampaunikar.com/pianotutor)**: no install, with more than 2,000 songs to learn. Use Chrome or Edge to connect a MIDI keyboard. iPhone and iPad browsers can't use MIDI keyboards, so open the page in the free [Web MIDI Browser](https://apps.apple.com/app/id953846217) app there, or play on screen.
+Open **[ghanshyampaunikar.com/pianotutor](https://ghanshyampaunikar.com/pianotutor)**: no install, with songs ready to play and room for any MIDI files you add. Use Chrome or Edge to connect a MIDI keyboard. iPhone and iPad browsers can't use MIDI keyboards, so open the page in the free [Web MIDI Browser](https://apps.apple.com/app/id953846217) app there, or play on screen.
 
 To run the web version from this repository:
 
@@ -170,6 +174,22 @@ Press **Up** and **Down** to change octave. In Free Play, hold **Space** to sust
 Piano Tutor is free with every feature included. The free version shows a small ad. If you enjoy it, a **one-time payment of $10 removes the ads forever**: no subscription, no account, nothing more to pay. You receive a licence key by email; paste it under **Remove ads** and the ads disappear.
 
 <img src="docs/screenshots/remove-ads.png" alt="Remove ads for a one-time $10" width="100%">
+
+---
+
+## Questions
+
+**Will it work with my keyboard?**<br>
+Any keyboard or digital piano with USB or Bluetooth MIDI: Yamaha, Casio, Roland, Korg, Kawai, Alesis, M-Audio, Arturia, Nektar and others. Plug it in and press **Connect keyboard**.
+
+**Can I learn a song that isn't included?**<br>
+Yes, always. Drop any MIDI file onto the app, use **Add Music Folder**, or click **add MIDI files** under the sidebar. Thousands of MIDI songs are available online.
+
+**I don't have a keyboard yet.**<br>
+Play with your computer keys, or click the keys on screen. Free Play is a good place to start.
+
+**Does it work on a phone or iPad?**<br>
+The web version runs on phones and tablets. Android works with a MIDI keyboard in Chrome. On iPhone and iPad, Apple does not let browsers use MIDI keyboards, so open the page in the free [Web MIDI Browser](https://apps.apple.com/app/id953846217) app, or play on screen.
 
 ---
 
